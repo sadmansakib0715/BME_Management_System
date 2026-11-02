@@ -6,8 +6,9 @@ do $$ declare t text; begin
     'sessional_gradesheets','course_records','peos','pos','peo_po_map','course_outcomes','co_po_map','students',
     'enrolments','assessment_components','assessment_items','item_date_history','assessment_questions','marks',
     'attainment_settings','attainment_snapshots','notifications_outbox'] loop
+    -- ENABLE (not FORCE): signed-in users are always subject to RLS, while the owning role
+    -- (Supabase's postgres) can run seeds and the security-definer functions below.
     execute format('alter table public.%I enable row level security', t);
-    execute format('alter table public.%I force row level security', t);
   end loop;
 end $$;
 
