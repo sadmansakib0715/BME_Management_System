@@ -1,8 +1,9 @@
 import { clsx } from 'clsx';
-import { Check, ChevronRight, ExternalLink, Loader2 } from 'lucide-react';
+import { CalendarDays, Check, ChevronRight, ExternalLink, Loader2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
+import { fmtDate } from '@/lib/format';
 import { nextActions, type EditTarget, type NodeState, type RolledNode, type Tone } from '@/lib/progressTree';
 
 const STATE_TEXT: Record<NodeState, string> = {
@@ -15,6 +16,8 @@ export interface ProgressTreeProps {
   onPick: (target: EditTarget, value: string) => Promise<unknown>;
   /** Whether the person may change this field. */
   canEdit: (target: EditTarget) => boolean;
+  /** Opens the date picker for an assessment. Picking “Scheduled” for an undated one opens it too. */
+  onSetDate?: (itemId: string) => void;
   /** Shown at the right of the header, e.g. an Add assessment button. */
   actions?: ReactNode;
   /** Branches at this depth start folded (1 = each course in a multi-course tree). Without it, only finished branches fold. */
@@ -50,7 +53,7 @@ function countLeaves(n: RolledNode, out: Partial<Record<NodeState, number>> = {}
 
 // ---------------------------------------------------------------- dropdown
 
-function StatusMenu({ node, anchor, onClose, onPick, canEdit }: { node: RolledNode; anchor: HTMLElement; onClose: () => void } & Pick<ProgressTreeProps, 'onPick' | 'canEdit'>) {
+function StatusMenu({ node, anchor, onClose, onPick, canEdit, onSetDate }: { node: RolledNode; anchor: HTMLElement; onClose: () => void } & Pick<ProgressTreeProps, 'onPick' | 'canEdit' | 'onSetDate'>) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: -9999, left: -9999 });
   const [busy, setBusy] = useState<string | null>(null);
@@ -82,7 +85,11 @@ function StatusMenu({ node, anchor, onClose, onPick, canEdit }: { node: RolledNo
     all[(i + (e.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length]?.focus();
   };
 
+  const dated = node.dated && onSetDate && node.edits?.some((g) => canEdit(g.target)) ? node.dated : null;
+  const setDate = () => { onClose(); onSetDate!(dated!.itemId); };
   const pick = async (target: EditTarget, value: string) => {
+    // A scheduled test needs a date: open the date picker, which marks it scheduled when saved.
+    if (dated && !dated.date && target.kind === 'item' && target.field === 'status' && value === 'scheduled') return setDate();
     const key = JSON.stringify(target) + value;
     setBusy(key);
     try { await onPick(target, value); onClose(); anchor.focus(); } catch { /* caller reports */ } finally { setBusy(null); }
@@ -92,10 +99,17 @@ function StatusMenu({ node, anchor, onClose, onPick, canEdit }: { node: RolledNo
     <div ref={ref} role="menu" aria-label={`${node.label} status`} onKeyDown={keys} style={{ top: pos.top, left: pos.left }}
       className="fixed z-50 w-64 rounded-lg border border-line bg-surface shadow-pop py-1.5 text-sm">
       <div className="px-3 pt-1 pb-2 border-b border-line">
-        <div className="font-medium truncate">{node.label}</div>
+        <div className="font-semibold truncate">{node.label}</div>
         <div className="flex items-center gap-1.5 text-2xs text-muted mt-0.5"><Dot state={node.state} />{STATE_TEXT[node.state]}{node.hint && node.hint !== STATE_TEXT[node.state] ? `, ${node.hint}` : ''}</div>
         {locked && node.waitingOn && <div className="text-2xs text-subtle mt-1">Opens when {node.waitingOn} {node.waitingOn.includes(',') ? 'are' : 'is'} done.</div>}
       </div>
+      {dated && !locked && (
+        <button type="button" role="menuitem" onClick={setDate}
+          className="mx-2 mt-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-md border border-brand/40 bg-brand-soft px-2.5 py-1.5 text-left font-semibold text-brand-ink hover:border-brand focus:border-brand focus:outline-none cursor-pointer">
+          <CalendarDays className="size-4" aria-hidden />
+          <span className="flex-1">{dated.date ? 'Change the date' : 'Set the date'}</span>
+          {dated.date && <span className="text-2xs font-medium">{fmtDate(dated.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>}
+        </button>)}
       {node.edits?.length ? node.edits.map((g) => {
         const allowed = canEdit(g.target) && !locked;
         return (
@@ -173,7 +187,7 @@ function Branch({ n, depth, ctx }: { n: RolledNode; depth: number; ctx: Ctx }) {
 }
 
 /** Horizontal, live progress tree for one course or many. It re-renders whenever the data does. */
-export default function ProgressTree({ root, onPick, canEdit, actions, foldAt }: ProgressTreeProps) {
+export default function ProgressTree({ root, onPick, canEdit, onSetDate, actions, foldAt }: ProgressTreeProps) {
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   const [menu, setMenu] = useState<{ id: string; el: HTMLElement } | null>(null);
   const next = nextActions(root);
@@ -205,7 +219,7 @@ export default function ProgressTree({ root, onPick, canEdit, actions, foldAt }:
               className={clsx('inline-flex items-center gap-1.5 rounded border px-2 py-1 hover:bg-sunken transition-colors duration-150 cursor-pointer',
                 node.state === 'returned' ? 'border-warn/40' : 'border-line')}>
               <Dot state={node.state} />
-              <span className="text-subtle">{path.join(' / ')}{path.length ? ' / ' : ''}</span>{node.label}
+              <span className="text-muted font-medium">{path.join(' / ')}{path.length ? ' / ' : ''}</span><span className="font-semibold">{node.label}</span>
             </button>
           ))}
         </div>
@@ -214,13 +228,13 @@ export default function ProgressTree({ root, onPick, canEdit, actions, foldAt }:
       <div className="overflow-x-auto px-4 py-5">
         <div className="ptree"><Branch n={root} depth={0} ctx={ctx} /></div>
       </div>
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 px-4 pb-3 text-2xs text-muted" aria-label="Legend">
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 px-4 pb-3 text-2xs font-medium text-ink" aria-label="Legend">
         {(['done', 'active', 'returned', 'ready', 'locked'] as NodeState[]).map((s) => (
-          <li key={s} className="inline-flex items-center gap-1.5"><Dot state={s} />{STATE_TEXT[s]}<span className="tabular text-subtle">{counts[s] ?? 0}</span></li>
+          <li key={s} className="inline-flex items-center gap-1.5"><Dot state={s} />{STATE_TEXT[s]}<span className="tabular font-bold">{counts[s] ?? 0}</span></li>
         ))}
         <li className="ml-auto text-subtle">Click a branch to open it, or a step to change its status.</li>
       </ul>
-      {menu && menuNode && <StatusMenu key={menu.id} node={menuNode} anchor={menu.el} onClose={() => setMenu(null)} onPick={onPick} canEdit={canEdit} />}
+      {menu && menuNode && <StatusMenu key={menu.id} node={menuNode} anchor={menu.el} onClose={() => setMenu(null)} onPick={onPick} canEdit={canEdit} onSetDate={onSetDate} />}
     </div>
   );
 }

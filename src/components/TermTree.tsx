@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useAuth } from '@/auth/AuthProvider';
 import ProgressTree from '@/components/ProgressTree';
 import { ErrorNote, Spinner, useToast } from '@/components/ui';
@@ -7,15 +8,19 @@ import { supabase } from '@/lib/supabase';
 import { useTerm } from '@/lib/TermContext';
 import type { Course, Offering } from '@/lib/types';
 import { stepOwner } from '@/lib/workflow';
+import { RescheduleDialog } from '@/pages/course/AssessmentsTab';
 
 /**
  * Status writes from a progress tree. Each goes through the same write the course's own tabs use, with the same
  * permissions, and every write refreshes 'term' and 'obe', so the tree redraws by itself.
+ * Dates go through the course page's date dialog (clash check, change history); render `dateDialog` beside the tree.
  */
 export function useTreeEdits(data: TermData) {
   const { me, isAdmin, isHod } = useAuth();
   const { teachersOf } = useTerm();
   const toast = useToast();
+  const [dating, setDating] = useState<string | null>(null);
+  const datingItem = data.items.find((i) => i.id === dating) ?? null;
 
   const canEdit = (t: EditTarget) => {
     if (isAdmin) return true;
@@ -45,7 +50,8 @@ export function useTreeEdits(data: TermData) {
     (r) => { toast('ok', 'Status updated'); return r; },
     (e: Error) => { toast('bad', e.message); throw e; });
 
-  return { canEdit, onPick };
+  const dateDialog = <RescheduleDialog item={datingItem} onClose={() => setDating(null)} admin={isAdmin} />;
+  return { canEdit, onPick, onSetDate: setDating, dateDialog };
 }
 
 const levelTerm = (c: Course) => (c.level ? `Level ${c.level}${c.term_no ? `, Term ${c.term_no}` : ''}` : 'Other');
@@ -54,7 +60,7 @@ const levelTerm = (c: Course) => (c.level ? `Level ${c.level}${c.term_no ? `, Te
 export default function TermTree({ data, offerings, label, hint, byLevel }: { data: TermData; offerings: Offering[]; label: string; hint?: string; byLevel?: boolean }) {
   const { courseOf } = useTerm();
   const obe = useObeTerm(data.term.id, data.offerings.map((o) => o.id));
-  const { canEdit, onPick } = useTreeEdits(data);
+  const { canEdit, onPick, onSetDate, dateDialog } = useTreeEdits(data);
   if (obe.isLoading) return <Spinner label="Loading progress" />;
   if (obe.error) return <ErrorNote error={obe.error} />;
 
@@ -62,5 +68,5 @@ export default function TermTree({ data, offerings, label, hint, byLevel }: { da
     .sort((a, b) => (a.c.level ?? 9) - (b.c.level ?? 9) || (a.c.term_no ?? 9) - (b.c.term_no ?? 9) || a.c.code.localeCompare(b.c.code));
   const root = buildForest(label, hint, rows.map(({ o, c }) => ({
     node: courseNode(o, c, data, obe.data && obeSlice(obe.data, o.id)), group: byLevel ? levelTerm(c) : undefined })));
-  return <ProgressTree root={root} onPick={onPick} canEdit={canEdit} foldAt={byLevel ? 2 : 1} />;
+  return <><ProgressTree root={root} onPick={onPick} canEdit={canEdit} onSetDate={onSetDate} foldAt={byLevel ? 2 : 1} />{dateDialog}</>;
 }

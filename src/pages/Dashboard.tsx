@@ -39,8 +39,8 @@ export default function Dashboard() {
       <div className="mb-5"><WeekTracker term={data.term} /></div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <Stat label="Courses" value={data.offerings.length} sub={`${theory.length} with a term final`} />
-        <Stat label="Term finals complete" value={`${finished}/${theory.length}`} />
         <Stat label="Assessments held" value={`${held}/${items.length}`} />
+        <Stat label="Term finals complete" value={`${finished}/${theory.length}`} />
         <Stat label="Marks published" value={`${published}/${items.length}`} />
       </div>
       <div className="grid gap-5 xl:grid-cols-2 [&>*]:min-w-0">

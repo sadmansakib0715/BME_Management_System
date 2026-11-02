@@ -115,7 +115,7 @@
   .tone-group   { --hue: var(--tone-group);   --hue-soft: var(--tone-group-soft); }
   .tone-course  { --hue: var(--tone-course);  --hue-soft: var(--tone-course-soft); }
 
-  .ptree-node { @apply relative z-[1] inline-flex items-center gap-2 max-w-[16rem] rounded-md border px-2.5 py-1.5 text-left text-sm font-medium whitespace-nowrap
+  .ptree-node { @apply relative z-[1] inline-flex items-center gap-2 max-w-[16rem] rounded-md border px-2.5 py-1.5 text-left text-sm font-semibold whitespace-nowrap
                 cursor-pointer transition-[transform,box-shadow,border-color,background-color] duration-150;
                 border-color: rgb(var(--line-strong)); background: rgb(var(--surface)); color: rgb(var(--ink)); box-shadow: 0 1px 2px rgb(var(--shade) / .06); }
   .ptree-node:hover { transform: translateY(-1px); box-shadow: 0 4px 12px -4px rgb(var(--hue, var(--shade)) / .35); }
@@ -123,24 +123,24 @@
   .ptree-root { @apply cursor-default px-3.5 py-2 rounded-lg font-semibold; color: #fff; border-color: transparent;
                 background: linear-gradient(135deg, rgb(var(--root-a)), rgb(var(--root-b))); box-shadow: 0 6px 18px -8px rgb(var(--root-a) / .7); }
   .ptree-root:hover { transform: none; }
-  .ptree-root .ptree-sub { color: rgb(255 255 255 / .78); }
+  .ptree-root .ptree-sub { color: rgb(255 255 255 / .9); }
   /* Branches: tinted with their stage hue, with a small progress bar. */
-  .ptree-branch { font-weight: 600; color: rgb(var(--hue, var(--ink))); background: rgb(var(--hue-soft, var(--sunken)));
+  .ptree-branch { font-weight: 700; color: rgb(var(--hue, var(--ink))); background: rgb(var(--hue-soft, var(--sunken)));
                   border-color: rgb(var(--hue, var(--line-strong)) / .4); }
-  .ptree-course { color: rgb(var(--ink)); background: rgb(var(--surface)); border-color: rgb(var(--hue) / .35); box-shadow: inset 3px 0 0 rgb(var(--hue)), 0 1px 2px rgb(var(--shade) / .06); }
+  .ptree-course { font-weight: 700; color: rgb(var(--ink)); background: rgb(var(--surface)); border-color: rgb(var(--hue) / .35); box-shadow: inset 3px 0 0 rgb(var(--hue)), 0 1px 2px rgb(var(--shade) / .06); }
   .ptree-bar { @apply block h-1 w-full mt-1 rounded-full overflow-hidden; background: rgb(var(--hue, var(--subtle)) / .18); }
   .ptree-bar > span { @apply block h-full rounded-full transition-[width] duration-500; background: rgb(var(--hue, var(--ok))); }
-  .ptree-count { @apply tabular text-2xs font-semibold rounded-full px-1.5 py-px; background: rgb(var(--hue, var(--subtle)) / .14); color: rgb(var(--hue, var(--muted))); }
+  .ptree-count { @apply tabular text-2xs font-bold rounded-full px-1.5 py-px; background: rgb(var(--hue, var(--subtle)) / .14); color: rgb(var(--hue, var(--muted))); }
   /* Steps: filled by state. */
   .ptree-s-done     { background: rgb(var(--ok-soft)); border-color: rgb(var(--ok) / .4); }
   .ptree-s-active   { background: rgb(var(--info-soft)); border-color: rgb(var(--info) / .45); }
   .ptree-s-returned { background: rgb(var(--warn-soft)); border-color: rgb(var(--warn) / .55); }
   .ptree-s-ready    { border-color: rgb(var(--hue, var(--brand)) / .45); box-shadow: inset 3px 0 0 rgb(var(--hue, var(--brand))), 0 1px 2px rgb(var(--shade) / .06); }
-  .ptree-s-locked   { @apply font-normal; color: rgb(var(--subtle)); background: rgb(var(--sunken) / .6); border-style: dashed; box-shadow: none; }
-  .ptree-s-na       { @apply font-normal; color: rgb(var(--subtle)); background: transparent; border-style: dotted; opacity: .7; box-shadow: none; }
+  .ptree-s-locked   { @apply font-semibold; color: rgb(var(--muted)); background: rgb(var(--sunken) / .6); border-style: dashed; box-shadow: none; }
+  .ptree-s-na       { @apply font-medium; color: rgb(var(--muted)); background: transparent; border-style: dotted; opacity: .7; box-shadow: none; }
   .ptree-node-open  { outline: 2px solid rgb(var(--hue, var(--brand)) / .6); outline-offset: 2px; }
   .ptree-next { box-shadow: 0 0 0 2px rgb(var(--brand) / .6); animation: ptree-call 1.6s ease-out 2; }
-  .ptree-sub { @apply block truncate text-2xs font-normal; color: rgb(var(--muted)); }
+  .ptree-sub { @apply block truncate text-2xs font-semibold; color: rgb(var(--ink) / .8); }
   /* Dots: shape and colour per state. */
   .ptree-dot { @apply inline-block size-2.5 shrink-0 rounded-full; }
   .ptree-dot-done { background: rgb(var(--ok)); box-shadow: 0 0 0 2px rgb(var(--ok) / .2); }

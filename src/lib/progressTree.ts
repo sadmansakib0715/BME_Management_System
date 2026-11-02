@@ -1,6 +1,7 @@
 // Course progress tree: one offering's whole lifecycle (setup → assessments → exam → results → OBE → close-out)
 // derived from data the app already loads. Nothing is stored; edit any status anywhere and the tree follows.
 import type { ObeTerm, TermData } from './api';
+import { fmtDate } from './format';
 import { courseFile } from './obe';
 import type { CarReport, CoPo, Course, CourseFileItem, CourseOutcome, ExamStep, ObeAttainment, Offering } from './types';
 import {
@@ -34,6 +35,7 @@ export interface PNode {
   toLabel?: string;         // name of that page, for the dropdown link
   edits?: EditGroup[];      // statuses you can set from the tree; none means the step follows other data
   waitingOn?: string;       // what has to finish first, when locked
+  dated?: { itemId: string; date: string | null };   // an assessment whose date can be set from the tree
   children?: PNode[];
 }
 
@@ -141,8 +143,9 @@ export function courseNode(offering: Offering, course: Course, data: TermData, o
     : i.status === 'held' || marksUnderEvaluation(i.marks_status) ? 'active' : 'ready';
   const itemHint = (i: Item) =>
     marksPublished(i.marks_status) ? 'Marks published' : i.status === 'held' ? 'Held, marks pending'
-    : i.held_on ? `On ${i.held_on}` : i.status === 'cancelled' ? 'Cancelled' : 'Not scheduled';
+    : i.held_on ? `On ${fmtDate(i.held_on, { weekday: 'short', day: 'numeric', month: 'short' })}` : i.status === 'cancelled' ? 'Cancelled' : 'Not scheduled';
   const leaf = (i: Item, name = i.title): PNode => ({ id: i.id, label: secName(i.section_id) ? `${name} · ${secName(i.section_id)}` : name, state: itemState(i), hint: itemHint(i), ...page.assess,
+    dated: { itemId: i.id, date: i.held_on },
     edits: [
       // Postponing needs a new date, so it is done from the assessments page.
       { label: 'Held', target: { offering: id, kind: 'item', itemId: i.id, field: 'status' }, value: i.status, options: ITEM_STATUS, elsewhere: ['postponed'] },

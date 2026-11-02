@@ -23,7 +23,7 @@ export default function CourseDetail() {
 
   const isTheory = c.course_type === 'theory';
   const tabs = [
-    ['overview', 'Overview'], ['exam', isTheory ? 'Exam workflow' : 'Gradesheet'], ['assessments', isTheory ? 'Class tests & plan' : 'Assessments'],
+    ['overview', 'Overview'], ['assessments', isTheory ? 'Class tests & plan' : 'Assessments'], ['exam', isTheory ? 'Exam workflow' : 'Gradesheet'],
     ['outcomes', 'OBE'], ['progress', 'Progress tree'],
   ] as const;
   const props = { offering: o, course: c, data };
@@ -48,8 +48,8 @@ export default function CourseDetail() {
       </nav>
       <Suspense fallback={<Spinner />}>
         {tab === 'overview' && <Overview {...props} />}
-        {tab === 'exam' && <ExamTab {...props} />}
         {tab === 'assessments' && <AssessmentsTab {...props} />}
+        {tab === 'exam' && <ExamTab {...props} />}
         {tab === 'outcomes' && <OutcomesTab {...props} />}
         {tab === 'progress' && <ProgressTab {...props} />}
       </Suspense>

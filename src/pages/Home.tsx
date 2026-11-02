@@ -136,12 +136,6 @@ function CourseCard({ data, me, o, c, a, teaches, examRoles, gsRole }: {
       </div>
       <div className="flex flex-wrap gap-1">{roles.map((r) => <span key={r} className="text-2xs font-medium rounded px-1.5 py-0.5 bg-sunken text-muted">{r}</span>)}</div>
       <div className="space-y-2.5">
-        {p && (
-          <div>
-            <div className="flex justify-between text-2xs text-muted mb-1"><span>Term final{p.current ? ` · now at ${p.current.short}` : ' · complete'}</span><span className="tabular">{p.done}/{p.total}</span></div>
-            <Meter value={p.done} max={p.total} label={`${c.code} term-final progress`} />
-          </div>
-        )}
         {teaches && items.length > 0 && (
           <div>
             <div className="flex justify-between text-2xs text-muted mb-1"><span>Class tests & assessments held</span><span className="tabular">{held}/{items.length}</span></div>
@@ -150,6 +144,12 @@ function CourseCard({ data, me, o, c, a, teaches, examRoles, gsRole }: {
           </div>
         )}
         {teaches && !items.length && <p className="text-2xs text-subtle">No assessment plan yet</p>}
+        {p && (
+          <div>
+            <div className="flex justify-between text-2xs text-muted mb-1"><span>Term final{p.current ? ` · now at ${p.current.short}` : ' · complete'}</span><span className="tabular">{p.done}/{p.total}</span></div>
+            <Meter value={p.done} max={p.total} label={`${c.code} term-final progress`} />
+          </div>
+        )}
         {part && <p className="text-2xs text-ink"><span className="text-subtle">Your part: </span>{part}</p>}
         {teaches && next && <p className="text-2xs text-ink"><span className="text-subtle">Next: </span>{next.title} · {fmtDate(next.held_on, { weekday: 'short', day: 'numeric', month: 'short' })}</p>}
       </div>

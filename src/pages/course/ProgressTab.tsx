@@ -16,7 +16,7 @@ export default function ProgressTab({ offering, course, data }: TabProps) {
   const { teachersOf } = useTerm();
   const toast = useToast();
   const obe = useCourseObe(offering, data.term);
-  const { canEdit, onPick } = useTreeEdits(data);
+  const { canEdit, onPick, onSetDate, dateDialog } = useTreeEdits(data);
   const comps = data.components.filter((c) => c.offering_id === offering.id);
   const sections = data.sections.filter((s) => s.offering_id === offering.id);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -27,8 +27,9 @@ export default function ProgressTab({ offering, course, data }: TabProps) {
   if (obe.error) return <ErrorNote error={obe.error} />;
   return (
     <>
-      <ProgressTree root={buildCourseTree(offering, course, data, obe.data)} onPick={onPick} canEdit={canEdit}
+      <ProgressTree root={buildCourseTree(offering, course, data, obe.data)} onPick={onPick} canEdit={canEdit} onSetDate={onSetDate}
         actions={teaches && <Button size="sm" icon={<Plus className="size-4" aria-hidden />} onClick={() => setDraft(newComponentDraft(course))}>Add assessment</Button>} />
+      {dateDialog}
       <ComponentDialog key={draft ? 'open' : 'closed'} draft={draft} onClose={() => setDraft(null)} busy={saveComp.isPending} hasSections={sections.length > 1}
         onSave={(d) => saveComp.mutate(d, { onSuccess: () => { toast('ok', `${d.name.trim()} added`); setDraft(null); }, onError: (e) => toast('bad', e.message) })} />
     </>
