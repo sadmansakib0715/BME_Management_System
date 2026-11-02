@@ -39,8 +39,8 @@ tests/          unit tests (workflow, attainment, importer, dates)
 
 ### 1. Supabase project
 1. Create a project at supabase.com (free tier is enough to start).
-2. In **SQL Editor**, run every file in `supabase/migrations/` **in numeric order**, then `supabase/seed.sql`.
-   (Or with the CLI: `supabase link` then `supabase db push`, then run `seed.sql`.)
+2. In **SQL Editor**, paste and run `supabase/setup.sql` (all migrations plus reference data in one file).
+   (Or with the CLI: `supabase link`, `supabase db push`, then run `seed.sql`.)
 3. **Authentication → Providers → Email:** enable. **Authentication → URL configuration:** set the Site URL to where the app is hosted.
 4. Add yourself as the first HOD (replace the values) in the SQL Editor:
    ```sql
@@ -96,6 +96,21 @@ DB_URL=postgresql://postgres:postgres@localhost:5432/postgres npm run test:db   
 `supabase/tests/integration.sql` signs in as different users and checks: the sign-up gate; marks hidden from
 unrelated faculty; direct writes to exam tasks refused; dependency and ownership blocks; the full correction loop;
 CT clash detection; over-maximum and locked marks; item generation per sub-section; roster loading; admin-only import.
+
+## Open access (no sign-in)
+The database has one switch, `app_settings.open_access`, and `supabase/setup.sql` turns it **on**:
+nobody signs in, every visitor acts as an admin, and the sidebar shows a **Viewing as** picker so
+**My work** still lists that person's tasks. The picker is a convenience, not security.
+
+While it is on, anyone with the site link (or the database URL and anon key, which every visitor's
+browser receives) can read, change or delete everything, including student marks, and changes are not
+attributed to a person. Use it for setup and testing; switch it off before entering real marks:
+
+```sql
+update public.app_settings set open_access = false;   -- require sign-in (add a HOD first: first_admin.sql)
+update public.app_settings set open_access = true;    -- open again
+```
+The switch cannot be changed from the website, only in the Supabase SQL Editor.
 
 ## Rules worth knowing
 - **Attainment thresholds** (X, Y, level cut-offs) are set per term in **Term setup** (defaults 60 / 50; levels 50 / 60 / 70).

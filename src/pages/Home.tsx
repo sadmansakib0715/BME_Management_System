@@ -23,7 +23,14 @@ export default function Home() {
   const tasks = useMemo(() => (data && me?.facultyId ? buildTasks(data, me.facultyId, courseOf, nameOf, isAdmin) : []), [data, me, courseOf, nameOf, isAdmin]);
   if (loading) return <Spinner />;
   if (error) return <ErrorNote error={error} />;
-  if (!data) return <Empty title="No term set up yet">An admin can create a term or import the department workbook.</Empty>;
+  if (!data) return <Empty title="No term set up yet">Create a term in Term setup, or import the department workbook.</Empty>;
+  if (!me?.facultyId) return (
+    <>
+      <PageHeader eyebrow={data.term.name} title="My work" description="Your tasks across exams, class tests, marks and gradesheets." />
+      <div className="mb-5"><WeekTracker term={data.term} /></div>
+      <Card><Empty title="Choose your name to see your tasks">Pick yourself under “Viewing as” at the bottom of the sidebar. Everything else in the system is available without it.</Empty></Card>
+    </>
+  );
 
   const my = data.offerings.filter((o) => me?.facultyId && teachersOf(o.id).includes(me.facultyId));
   const myItems = data.items.filter((i) => my.some((o) => o.id === i.offering_id) && i.held_on && (daysUntil(i.held_on) ?? -1) >= 0 && (daysUntil(i.held_on) ?? 99) <= 7 && i.status !== 'cancelled')

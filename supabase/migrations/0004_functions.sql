@@ -110,7 +110,7 @@ declare
   code text;
   step_after text;
 begin
-  if me is null then raise exception 'Not signed in' using errcode = '42501'; end if;
+  if me is null and not admin then raise exception 'Not signed in' using errcode = '42501'; end if;
   if not (p_status = any (public.exam_step_statuses(p_step))) then
     raise exception 'Status "%" is not valid for step %', p_status, p_step using errcode = '22023';
   end if;

@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { BookOpen, CalendarDays, ClipboardList, FileUp, Gauge, Home, LogOut, Menu, Settings2, Target, Users, X } from 'lucide-react';
+import { BookOpen, CalendarDays, ClipboardList, FileUp, Gauge, Home, LogOut, Menu, Settings2, Target, Unlock, Users, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
@@ -18,8 +18,8 @@ function Item({ to, icon, children, end }: { to: string; icon: ReactNode; childr
 }
 
 function Sidebar() {
-  const { me, isAdmin, signOut, session } = useAuth();
-  const { terms, termId, setTermId, nameOf } = useTerm();
+  const { me, isAdmin, signOut, session, openAccess, setActingAs } = useAuth();
+  const { terms, termId, setTermId, nameOf, faculty } = useTerm();
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 pt-4 pb-3">
@@ -48,6 +48,19 @@ function Sidebar() {
           <Item to="/admin/import" icon={<FileUp className="size-4" />}>Import workbook</Item>
         </>}
       </nav>
+      {openAccess ? (
+        <div className="border-t border-line p-3 space-y-2">
+          <div className="flex items-start gap-1.5 rounded border border-warn/30 bg-warn-soft px-2 py-1.5 text-2xs text-warn">
+            <Unlock className="size-3.5 shrink-0 mt-px" aria-hidden />
+            <span>Open access: no sign-in, everyone can edit.</span>
+          </div>
+          <label htmlFor="acting-as" className="block text-2xs font-semibold uppercase tracking-wider text-subtle">Viewing as</label>
+          <Select id="acting-as" className="h-8" value={me?.facultyId ?? ''} onChange={(e) => setActingAs(e.target.value || null)}>
+            <option value="">Choose your name</option>
+            {faculty.filter((f) => f.status !== 'former').map((f) => <option key={f.id} value={f.id}>{f.display_name}</option>)}
+          </Select>
+        </div>
+      ) : (
       <div className="border-t border-line p-3 flex items-center gap-2">
         <div className="size-8 rounded-full bg-sunken grid place-items-center text-2xs font-semibold text-muted" aria-hidden>
           {nameOf(me?.facultyId).replace(/^(Dr|Mr|Ms|Mrs|Prof)\.?\s+/, '').split(' ').map((p) => p[0]).slice(0, 2).join('')}
@@ -60,6 +73,7 @@ function Sidebar() {
           <LogOut className="size-4" aria-hidden />
         </button>
       </div>
+      )}
     </div>
   );
 }

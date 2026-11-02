@@ -2,6 +2,8 @@
 -- Requires the local auth stub (auth.users, auth.uid() from request.jwt.claim.sub). Every check raises on failure.
 \set ON_ERROR_STOP 1
 begin;
+-- These checks test sign-in security, so turn the open-access switch off for this transaction.
+update public.app_settings set open_access = false;
 
 -- Sign-up gate
 do $$ begin
@@ -121,6 +123,25 @@ do $$ declare r jsonb; begin
   if not exists (select 1 from public.students where student_no = '2118099') then raise exception 'FAIL: new student invisible to teacher'; end if;
   begin perform public.enrol_students((select o202 from ids), '[{"student_no":"2118098","name":"X"}]'); raise exception 'FAIL: non-teacher enrolled';
   exception when others then if sqlerrm not like 'Only this course%' then raise; end if; end;
+end $$;
+
+-- Open access: with the switch on, an anonymous visitor reads and edits everything; with it off, sees nothing.
+reset role;
+do $$ begin
+  if exists (select 1 from public.offerings) is false then raise exception 'FAIL: no data'; end if;
+end $$;
+select set_config('request.jwt.claim.sub', '', true);   -- a real anonymous visitor carries no user id
+set local role anon;
+do $$ begin
+  if (select count(*) from public.marks) <> 0 then raise exception 'FAIL: anon sees marks while sign-in is required'; end if;
+end $$;
+reset role; update public.app_settings set open_access = true; set local role anon;
+do $$ begin
+  if (select count(*) from public.marks) = 0 then raise exception 'FAIL: open access does not show marks'; end if;
+  update public.terms set latest_completed_week = 3 where code = 'DEMO-2026';
+  if (select latest_completed_week from public.terms where code = 'DEMO-2026') <> 3 then raise exception 'FAIL: open access cannot edit'; end if;
+  update public.app_settings set open_access = false;
+  if not public.app_open_access() then raise exception 'FAIL: the website could switch security'; end if;
 end $$;
 
 reset role;

@@ -23,9 +23,8 @@ function AdminOnly({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
-  const { session, me, loading, error, retry, signOut } = useAuth();
+  const { session, me, loading, error, retry, signOut, openAccess } = useAuth();
   if (loading) return <Spinner label="Signing in" />;
-  if (!session) return <Login />;
   if (error) return (
     <div className="min-h-dvh grid place-items-center p-6">
       <Empty title="Could not reach BME Workflow" action={<div className="flex gap-2"><Button variant="primary" onClick={retry}>Try again</Button><Button onClick={signOut}>Sign out</Button></div>}>
@@ -33,10 +32,11 @@ export default function App() {
       </Empty>
     </div>
   );
+  if (!openAccess && !session) return <Login />;
   if (!me) return (
     <div className="min-h-dvh grid place-items-center p-6">
       <Empty title="Your account is not approved yet" action={<Button onClick={signOut}>Sign out</Button>}>
-        {session.user.email} is signed in but not on the department access list, or access was turned off. Ask the HOD or a department admin.
+        {session?.user.email} is signed in but not on the department access list, or access was turned off. Ask the HOD or a department admin.
       </Empty>
     </div>
   );
