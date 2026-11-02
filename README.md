@@ -2,7 +2,8 @@
 
 Course workflow and notification system for the Department of Biomedical Engineering, BUET.
 It replaces the term Activity Tracker spreadsheet and keeps everyone informed of whose turn it is.
-**Marks are not kept here**; the site tracks roles, exam steps, class-test dates and course outcomes.
+**Marks are not kept here**; the site tracks roles, exam steps, class-test dates, whether each item's marks are
+under evaluation or published (a status only), and course outcomes (OBE).
 
 | Area | What it does |
 | --- | --- |
@@ -10,10 +11,10 @@ It replaces the term Activity Tracker spreadsheet and keeps everyone informed of
 | Department | Open to all faculty: overview, all courses, the shared calendar and program outcomes (workload and setup gaps for HOD/admins) |
 | Theory exam chain | QP A/B → Moderation 1/2 (with "needs correction" rounds per half) → Printing → Script examination A/B → Scrutiny → Gradesheet prep → Gradesheet scrutiny → HOD. Examiner and gradesheet roles are derived, never typed |
 | Sessional courses | A1/A2 tracked separately: assessment plans per sub-section and the sessional gradesheet chain |
-| Class tests | Dates, statuses, date history with reasons, and a hard block on two class tests for the same cohort on one day (admin override with reason) |
+| Class tests | Dates, colour-coded statuses (planned → held) and marks status (not evaluated → under evaluation → published), date history with reasons, and a hard block on two class tests for the same cohort on one day (admin override with reason) |
 | Assessment plan | Components (CT, term final, lab report, viva…), counts and weights; items are generated automatically |
 | Course outcomes | COs with Bloom domain/level, CO–PO mapping (strength 1–3) against the department's PO1–PO12 |
-| Program view | Curriculum CO–PO coverage matrix |
+| OBE | Per-course CO readiness, curriculum CO–PO coverage matrix, POs and PEOs |
 | Term setup | Two ways: import the workbook, or set up by hand (term & dates, courses & sections, teachers & roles, class-test routine) |
 
 ## Architecture

@@ -23,7 +23,7 @@ export default function CourseDetail() {
   const isTheory = c.course_type === 'theory';
   const tabs = [
     ['overview', 'Overview'], ['exam', isTheory ? 'Exam workflow' : 'Gradesheet'], ['assessments', isTheory ? 'Class tests & plan' : 'Assessments'],
-    ['outcomes', 'Course outcomes'],
+    ['outcomes', 'OBE'],
   ] as const;
   const props = { offering: o, course: c, data };
 

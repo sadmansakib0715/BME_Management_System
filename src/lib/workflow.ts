@@ -83,7 +83,24 @@ export const FEEDBACK_STATUS: StatusOption[] = [NS, s('students_reminded', 'Stud
 export const CAR_STATUS: StatusOption[] = [NS, s('under_preparation', 'Under preparation'), s('prepared', 'Prepared'), s('final', 'Final')];
 export const SG_PREP_STATUS: StatusOption[] = [NS, s('under_preparation', 'Under preparation'), s('prepared', 'Prepared'), s('uploaded_biis', 'Uploaded in BIIS'), s('forwarded', 'Forwarded to scrutinizer')];
 export const SG_SCRUTINY_STATUS: StatusOption[] = [NS, s('under_scrutiny', 'Under scrutiny'), s('scrutinized', 'Scrutinized'), s('forwarded_hod', 'Forwarded to HOD')];
+/** Marks are not kept here; teachers only record whether an item's marks are out. 'verified'/'locked' come from older data or the workbook. */
+export const MARKS_STATE: StatusOption[] = [s('none', 'Not evaluated'), s('entering', 'Under evaluation'), s('published', 'Published')];
+export const MARKS_LEGACY: StatusOption[] = [s('verified', 'Under evaluation (verified)'), s('locked', 'Published (locked)')];
+export const marksPublished = (s: string) => s === 'published' || s === 'locked';
+export const marksUnderEvaluation = (s: string) => s === 'entering' || s === 'verified';
 export const labelOf = (opts: StatusOption[], v: string) => opts.find((o) => o.value === v)?.label ?? v;
+
+export type ProgressTone = 0 | 1 | 2 | 3 | 'n';
+const OFF_PATH: Record<string, ProgressTone> = { cancelled: 'n', postponed: 1, needs_correction: 0, under_correction: 0, verified: 2, locked: 3 };
+/** Colour step for a status: first step 0 (mild red), done 3 (green), in between 1–2 by how far along it is. */
+export function progressTone(opts: StatusOption[], value: string, done = opts[opts.length - 1].value): ProgressTone {
+  if (value in OFF_PATH) return OFF_PATH[value];
+  const path = opts.filter((o) => !(o.value in OFF_PATH)).map((o) => o.value);
+  const i = path.indexOf(value), end = path.indexOf(done);
+  if (i <= 0 || end <= 0) return 0;
+  if (i >= end) return 3;
+  return i / end <= 0.5 ? 1 : 2;
+}
 
 export const COMPONENT_KINDS: StatusOption[] = [
   s('class_test', 'Class test'), s('term_final', 'Term final'), s('attendance', 'Attendance'), s('lab_report', 'Lab report'),

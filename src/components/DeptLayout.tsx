@@ -1,13 +1,12 @@
 import { clsx } from 'clsx';
 import { NavLink, Outlet } from 'react-router-dom';
 
-/** The department area: one place for the overview, every course, the shared calendar and program outcomes. */
-export const DEPT_PATHS = ['/dashboard', '/courses', '/calendar', '/outcomes'];
+/** The department area: one place for the overview, every course and the shared calendar. OBE has its own sidebar entry. */
+export const DEPT_PATHS = ['/dashboard', '/courses', '/calendar'];
 const TABS = [
   { to: '/dashboard', label: 'Overview' },
   { to: '/courses', label: 'All courses' },
   { to: '/calendar', label: 'Calendar' },
-  { to: '/outcomes', label: 'Program outcomes' },
 ];
 
 export function DeptLayout() {

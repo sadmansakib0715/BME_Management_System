@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { Building2, Compass, LogOut, Menu, Monitor, Moon, Settings2, Sun, Unlock, UserRound, Users, X } from 'lucide-react';
+import { Building2, Compass, GraduationCap, LogOut, Menu, Monitor, Moon, Settings2, Sun, Unlock, UserRound, Users, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
@@ -65,6 +65,7 @@ function Sidebar() {
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 space-y-0.5">
         <Item to="/" end icon={<UserRound className="size-4" />}>My courses</Item>
         <Item to="/dashboard" also={DEPT_PATHS} icon={<Building2 className="size-4" />}>Department</Item>
+        <Item to="/outcomes" icon={<GraduationCap className="size-4" />}>OBE</Item>
         {isAdmin && <>
           <div className="pt-4 pb-1 px-2.5 text-2xs font-semibold uppercase tracking-wider text-subtle">Administration</div>
           <Item to="/admin/term" icon={<Settings2 className="size-4" />}>Term setup</Item>

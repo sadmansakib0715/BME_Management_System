@@ -1,13 +1,13 @@
 import { CalendarDays, History, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useAuth } from '@/auth/AuthProvider';
-import { Badge, Button, Callout, Card, CardHeader, Dialog, Empty, Field, Input, Select, SegTabs, Textarea, useToast } from '@/components/ui';
+import { Badge, Button, Callout, Card, CardHeader, Dialog, Empty, Field, Input, Select, SegTabs, StatusSelect, Textarea, useToast } from '@/components/ui';
 import { must, rpc, useItemHistory, useWrite } from '@/lib/api';
 import { fmtDate, fmtDateLong } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { useTerm } from '@/lib/TermContext';
 import type { AssessmentComponent, AssessmentItem, ComponentKind } from '@/lib/types';
-import { COMPONENT_KINDS, ITEM_STATUS, labelOf } from '@/lib/workflow';
+import { COMPONENT_KINDS, ITEM_STATUS, labelOf, MARKS_LEGACY, MARKS_STATE } from '@/lib/workflow';
 import type { TabProps } from './shared';
 
 type Draft = Omit<AssessmentComponent, 'id' | 'offering_id' | 'sort'> & { id?: string };
@@ -79,7 +79,7 @@ export default function AssessmentsTab({ offering, course, data }: TabProps) {
           subtitle="Dates feed the department calendar. Class tests for the same cohort cannot share a day."
           actions={sections.length > 1 && <SegTabs label="Sub-section" value={section} onChange={setSection} options={[{ value: 'all', label: 'All' }, ...sections.map((s) => ({ value: s.id, label: s.name }))]} />} />
         <div className="overflow-x-auto"><table className="table">
-          <thead><tr><th>Item</th>{sections.length > 1 && <th>Section</th>}<th>Date</th><th>Status</th><th>Responsible</th></tr></thead>
+          <thead><tr><th>Item</th>{sections.length > 1 && <th>Section</th>}<th>Date</th><th>Status</th><th>Marks</th><th>Responsible</th></tr></thead>
           <tbody>{items.sort((a, b) => (a.held_on ?? '9').localeCompare(b.held_on ?? '9') || a.seq - b.seq).map((i) => (
             <tr key={i.id}>
               <td><div className="font-medium">{i.title}</div><div className="text-2xs text-subtle tabular">{Number(i.total_marks)} marks</div></td>
@@ -91,10 +91,14 @@ export default function AssessmentsTab({ offering, course, data }: TabProps) {
               </td>
               <td>
                 <label className="sr-only" htmlFor={`is-${i.id}`}>Status of {i.title}</label>
-                <Select id={`is-${i.id}`} className="h-8 w-36" disabled={!canEdit} value={i.status}
-                  onChange={(e) => updItem.mutate({ id: i.id, patch: { status: e.target.value as AssessmentItem['status'] } }, { onError: (er) => toast('bad', er.message) })}>
-                  {ITEM_STATUS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </Select>
+                <StatusSelect id={`is-${i.id}`} className="h-8 w-36" disabled={!canEdit} opts={ITEM_STATUS} done="held" value={i.status}
+                  onChange={(e) => updItem.mutate({ id: i.id, patch: { status: e.target.value as AssessmentItem['status'] } }, { onError: (er) => toast('bad', er.message) })} />
+              </td>
+              <td>
+                <label className="sr-only" htmlFor={`im-${i.id}`}>Marks for {i.title}</label>
+                <StatusSelect id={`im-${i.id}`} className="h-8 w-44" disabled={!canEdit} value={i.marks_status}
+                  opts={[...MARKS_STATE, ...MARKS_LEGACY.filter((m) => m.value === i.marks_status)]} done="published"
+                  onChange={(e) => updItem.mutate({ id: i.id, patch: { marks_status: e.target.value as AssessmentItem['marks_status'] } }, { onError: (er) => toast('bad', er.message) })} />
               </td>
               <td>
                 <label className="sr-only" htmlFor={`ir-${i.id}`}>Responsible teacher for {i.title}</label>

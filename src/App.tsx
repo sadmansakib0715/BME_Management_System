@@ -66,8 +66,8 @@ export default function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="courses" element={<Courses />} />
               <Route path="calendar" element={<Calendar />} />
-              <Route path="outcomes" element={<Outcomes />} />
             </Route>
+            <Route path="outcomes" element={<Outcomes />} />
             <Route path="courses/:id/:tab?" element={<CourseDetail />} />
             <Route path="guide" element={<Guide isAdmin={isAdmin} />} />
             <Route path="admin/assignments" element={<Navigate to="/admin/term/people" replace />} />

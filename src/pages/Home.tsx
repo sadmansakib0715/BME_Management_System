@@ -9,7 +9,7 @@ import type { TermData } from '@/lib/api';
 import { fmtDate, todayISO } from '@/lib/format';
 import { useTerm } from '@/lib/TermContext';
 import type { Course, ExamAssignment, Offering } from '@/lib/types';
-import { blockers, EXAM_STEPS, examProgress, stepDef, stepOwner, stepState } from '@/lib/workflow';
+import { blockers, EXAM_STEPS, examProgress, marksPublished, marksUnderEvaluation, stepDef, stepOwner, stepState } from '@/lib/workflow';
 
 /** Start page: my courses and how each is going, then my calendar of class tests and exams. No deadlines or delay counts by design. */
 
@@ -104,6 +104,8 @@ function CourseCard({ data, me, o, c, a, teaches, examRoles, gsRole }: {
   const p = a ? examProgress(tasks) : null;
   const items = data.items.filter((i) => i.offering_id === o.id && i.status !== 'cancelled');
   const held = items.filter((i) => i.status === 'held').length;
+  const pub = items.filter((i) => marksPublished(i.marks_status)).length;
+  const evaluating = items.filter((i) => marksUnderEvaluation(i.marks_status)).length;
   const today = todayISO();
   const next = items.filter((i) => i.held_on && i.held_on >= today && i.status !== 'held').sort((x, y) => x.held_on!.localeCompare(y.held_on!))[0];
   const roles = [teaches && 'Teacher', ...examRoles.map((k) => ROLE[k]), gsRole].filter(Boolean) as string[];
@@ -135,6 +137,7 @@ function CourseCard({ data, me, o, c, a, teaches, examRoles, gsRole }: {
           <div>
             <div className="flex justify-between text-2xs text-muted mb-1"><span>Class tests & assessments held</span><span className="tabular">{held}/{items.length}</span></div>
             <Meter value={held} max={items.length} label={`${c.code} assessments held`} />
+            <p className="text-2xs text-muted mt-1.5"><span className="text-subtle">Marks: </span>{pub} published{evaluating ? `, ${evaluating} under evaluation` : ''}</p>
           </div>
         )}
         {teaches && !items.length && <p className="text-2xs text-subtle">No assessment plan yet</p>}

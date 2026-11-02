@@ -2,6 +2,8 @@
 const v = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  // Status colours are chosen at runtime (progressTone), so they never appear literally in the source.
+  safelist: ['prog-0', 'prog-1', 'prog-2', 'prog-3', 'prog-n'],
   darkMode: ['selector', '[data-theme="dark"]'],
   theme: {
     extend: {

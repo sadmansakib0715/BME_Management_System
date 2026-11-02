@@ -56,7 +56,7 @@ export default function OutcomesTab({ offering }: TabProps) {
   return (
     <div className="space-y-5">
       <Card>
-        <CardHeader title="Course outcomes" subtitle="What students should be able to do by the end of the course, with the taxonomy level."
+        <CardHeader title="Course outcomes (COs)" subtitle="What the course aims to achieve, with the taxonomy level. Map each CO to the POs below."
           actions={canEdit && <>
             <Button size="sm" icon={<Plus className="size-4" aria-hidden />} onClick={() => setCos((x) => [...x, { tmp: crypto.randomUUID(), code: `CO${x.length + 1}`, statement: '', domain: 'cognitive', level: 3, map: {} }])}>Add outcome</Button>
             <Button size="sm" variant="primary" disabled={!dirty || cos.some((c) => !c.statement.trim())} loading={save.isPending}

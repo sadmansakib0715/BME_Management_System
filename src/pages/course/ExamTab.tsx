@@ -3,7 +3,7 @@ import { Check, Lock } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
-import { Badge, Button, Callout, Card, CardHeader, Dialog, Empty, Field, Select, StatePill, Textarea, useToast } from '@/components/ui';
+import { Badge, Button, Callout, Card, CardHeader, Dialog, Empty, Field, Select, StatePill, StatusBadge, StatusSelect, Textarea, useToast } from '@/components/ui';
 import { rpc, useWrite } from '@/lib/api';
 import { fmtDateLong } from '@/lib/format';
 import { useTerm } from '@/lib/TermContext';
@@ -62,7 +62,6 @@ function TheoryExam({ offering, data }: TabProps) {
             const owner = stepOwner(a, def.key);
             const mine = canAct(def.key);
             const value = draft[def.key] ?? cur;
-            const returned = cur === 'under_correction' || cur === 'needs_correction';
             return (
               <li key={def.key} className={clsx('px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2', st === 'locked' && 'bg-sunken/40')}>
                 <span className={clsx('size-7 rounded-full grid place-items-center text-2xs font-semibold shrink-0 border',
@@ -74,13 +73,12 @@ function TheoryExam({ offering, data }: TabProps) {
                   <div className="text-2xs text-subtle">{def.key === 'printing' ? 'Department office' : def.key === 'hod' && cur === 'forwarded' ? 'Awaiting HOD' : nameOf(owner)}
                     {st === 'locked' && ` · waiting on ${blockers(tasks, def.key).map((k) => stepDef(k).short).join(', ')}`}</div>
                 </div>
-                <StatePill state={returned ? 'returned' : st}>{statusLabel(def.key, cur)}</StatePill>
+                {st === 'locked' ? <StatePill state="locked">{statusLabel(def.key, cur)}</StatePill> : <StatusBadge opts={def.statuses} done={def.done} value={cur} />}
                 {mine && st !== 'locked' && (
                   <div className="flex items-center gap-2 ml-auto">
                     <label htmlFor={`st-${def.key}`} className="sr-only">New status for {def.label}</label>
-                    <Select id={`st-${def.key}`} className="h-8 w-44" value={value} onChange={(e) => setDraft((d) => ({ ...d, [def.key]: e.target.value }))}>
-                      {allowedStatuses(def.key).map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </Select>
+                    <StatusSelect id={`st-${def.key}`} className="h-8 w-44" opts={allowedStatuses(def.key)} scale={def.statuses} done={def.done} value={value}
+                      onChange={(e) => setDraft((d) => ({ ...d, [def.key]: e.target.value }))} />
                     <Button size="sm" variant="primary" disabled={value === cur} loading={write.isPending && write.variables?.step === def.key}
                       onClick={() => (value === 'needs_correction' ? setDlg({ step: def.key, status: value, override: false }) : submit(def.key, value))}>Update</Button>
                   </div>
@@ -161,10 +159,10 @@ function GradesheetPart({ offering, part, title, who, status, opts, enabled }: {
   return (
     <div className="px-4 py-3 flex flex-wrap items-center gap-3">
       <div className="flex-1 min-w-48"><div className="text-sm font-medium">{title}</div><div className="text-2xs text-subtle">{nameOf(who)}</div></div>
-      <StatePill state={status === opts[opts.length - 1].value ? 'done' : !enabled ? 'locked' : status === 'not_started' ? 'ready' : 'active'}>{labelOf(opts, status)}</StatePill>
+      {!enabled && status === 'not_started' ? <StatePill state="locked">{labelOf(opts, status)}</StatePill> : <StatusBadge opts={opts} value={status} />}
       {mine && (enabled || isAdmin) && <div className="flex gap-2">
         <label className="sr-only" htmlFor={`sg-${part}`}>New status</label>
-        <Select id={`sg-${part}`} className="h-8 w-52" value={v} onChange={(e) => setV(e.target.value)}>{opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</Select>
+        <StatusSelect id={`sg-${part}`} className="h-8 w-52" opts={opts} value={v} onChange={(e) => setV(e.target.value)} />
         <Button size="sm" variant="primary" disabled={v === status} loading={write.isPending}
           onClick={() => write.mutate({ offering, part, status: v }, { onSuccess: () => toast('ok', `${title} updated`), onError: (e) => toast('bad', e.message) })}>Update</Button>
       </div>}

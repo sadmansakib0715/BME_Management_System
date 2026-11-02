@@ -1,5 +1,6 @@
 import { clsx } from 'clsx';
 import { AlertTriangle, CheckCircle2, CircleDashed, Clock3, Loader2, Lock, X, XCircle } from 'lucide-react';
+import { labelOf, progressTone, type StatusOption } from '@/lib/workflow';
 import { createContext, forwardRef, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState,
   type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 
@@ -51,6 +52,18 @@ const toneCls: Record<Tone, string> = {
 };
 export function Badge({ tone = 'neutral', children, icon, className }: { tone?: Tone; children: ReactNode; icon?: ReactNode; className?: string }) {
   return <span className={clsx('inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-2xs font-semibold whitespace-nowrap', toneCls[tone], className)}>{icon}{children}</span>;
+}
+/** Status as a coloured select: mild red at the first step through green when done. */
+export function StatusSelect({ opts, scale = opts, done, value, className, ...p }: SelectHTMLAttributes<HTMLSelectElement> & { opts: StatusOption[]; scale?: StatusOption[]; done?: string; value: string }) {
+  return (
+    <select className={clsx('input pr-7 cursor-pointer font-medium', `prog-${progressTone(scale, value, done)}`, className)} value={value} {...p}>
+      {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  );
+}
+/** Read-only status in the same colours. */
+export function StatusBadge({ opts, done, value, icon }: { opts: StatusOption[]; done?: string; value: string; icon?: ReactNode }) {
+  return <span className={clsx('inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-2xs font-semibold whitespace-nowrap', `prog-${progressTone(opts, value, done)}`)}>{icon}{labelOf(opts, value)}</span>;
 }
 export type StepTone = 'done' | 'active' | 'ready' | 'locked' | 'returned';
 export function StatePill({ state, children }: { state: StepTone; children: ReactNode }) {

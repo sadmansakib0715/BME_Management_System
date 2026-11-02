@@ -3,9 +3,9 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
 import { TypeBadge } from '@/components/bits';
-import { Card, Empty, ErrorNote, Input, Meter, PageHeader, SegTabs, Spinner } from '@/components/ui';
+import { Card, Empty, ErrorNote, Input, Meter, PageHeader, SegTabs, Spinner, StatusBadge } from '@/components/ui';
 import { useTerm } from '@/lib/TermContext';
-import { examProgress, labelOf, OUTLINE_STATUS } from '@/lib/workflow';
+import { examProgress, marksPublished, marksUnderEvaluation, OUTLINE_STATUS } from '@/lib/workflow';
 
 type Filter = 'all' | 'mine' | 'theory' | 'sessional';
 
@@ -56,10 +56,11 @@ export default function Courses() {
                       <td><Link to={`/courses/${o.id}`} className="link font-mono text-sm">{c.code}</Link><div className="text-2xs text-muted max-w-64 truncate">{c.title}</div></td>
                       <td><TypeBadge type={c.course_type} /></td>
                       <td className="text-sm text-muted max-w-64"><span className="line-clamp-2">{teachersOf(o.id).map(nameOf).join(', ') || '—'}</span></td>
-                      <td className="text-2xs text-muted">{rec ? labelOf(OUTLINE_STATUS, rec.outline_status) : '—'}</td>
+                      <td>{rec ? <StatusBadge opts={OUTLINE_STATUS} value={rec.outline_status} /> : <span className="text-2xs text-subtle">—</span>}</td>
                       <td>
                         {hasExam ? <><div className="text-2xs text-muted mb-1">Exam: {p.current ? p.current.short : 'Complete'} · {p.done}/{p.total}</div><Meter value={p.done} max={p.total} label={`${c.code} exam progress`} /></>
-                          : items.length ? <><div className="text-2xs text-muted mb-1">Assessments held {held}/{items.length}</div><Meter value={held} max={items.length} label={`${c.code} assessments held`} /></>
+                          : items.length ? <><div className="text-2xs text-muted mb-1">Assessments held {held}/{items.length}</div><Meter value={held} max={items.length} label={`${c.code} assessments held`} />
+                            <div className="text-2xs text-subtle mt-1">Marks {items.filter((i) => marksPublished(i.marks_status)).length} published{items.some((i) => marksUnderEvaluation(i.marks_status)) ? `, ${items.filter((i) => marksUnderEvaluation(i.marks_status)).length} under evaluation` : ''}</div></>
                           : <span className="text-2xs text-subtle">No assessments yet</span>}
                       </td>
                     </tr>

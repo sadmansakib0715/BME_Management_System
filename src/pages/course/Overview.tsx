@@ -1,9 +1,9 @@
 import { useAuth } from '@/auth/AuthProvider';
-import { Card, CardHeader, Select, useToast } from '@/components/ui';
+import { Card, CardHeader, StatusSelect, useToast } from '@/components/ui';
 import { must, useWrite } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { useTerm } from '@/lib/TermContext';
-import { CAR_STATUS, FEEDBACK_STATUS, OUTLINE_STATUS, type StatusOption } from '@/lib/workflow';
+import { CAR_STATUS, OUTLINE_STATUS, type StatusOption } from '@/lib/workflow';
 import type { TabProps } from './shared';
 
 export default function Overview({ offering, course, data }: TabProps) {
@@ -15,13 +15,11 @@ export default function Overview({ offering, course, data }: TabProps) {
   const save = useWrite((patch: Record<string, string>) => must(supabase.from('course_records').update({ ...patch, updated_at: new Date().toISOString() }).eq('offering_id', offering.id)));
   const sections = data.sections.filter((s) => s.offering_id === offering.id).sort((a, b) => a.name.localeCompare(b.name));
 
-  const StatusRow = ({ label, field, opts }: { label: string; field: 'outline_status' | 'feedback_status' | 'car_status'; opts: StatusOption[] }) => (
+  const StatusRow = ({ label, field, opts }: { label: string; field: 'outline_status' | 'car_status'; opts: StatusOption[] }) => (
     <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
       <label htmlFor={field} className="text-sm">{label}</label>
-      <Select id={field} className="w-56 h-8" disabled={!canEdit || !rec || save.isPending} value={rec?.[field] ?? 'not_started'}
-        onChange={(e) => save.mutate({ [field]: e.target.value }, { onSuccess: () => toast('ok', `${label} updated`), onError: (er) => toast('bad', er.message) })}>
-        {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </Select>
+      <StatusSelect id={field} className="w-56 h-8" disabled={!canEdit || !rec || save.isPending} opts={opts} value={rec?.[field] ?? 'not_started'}
+        onChange={(e) => save.mutate({ [field]: e.target.value }, { onSuccess: () => toast('ok', `${label} updated`), onError: (er) => toast('bad', er.message) })} />
     </div>
   );
 
@@ -41,7 +39,6 @@ export default function Overview({ offering, course, data }: TabProps) {
         <CardHeader title="Course records" subtitle={canEdit ? 'Course teachers update these.' : 'Read only'} />
         <div className="divide-y divide-line">
           <StatusRow label="Course outline" field="outline_status" opts={OUTLINE_STATUS} />
-          <StatusRow label="Student feedback" field="feedback_status" opts={FEEDBACK_STATUS} />
           <StatusRow label="Course File / CAR" field="car_status" opts={CAR_STATUS} />
         </div>
       </Card>

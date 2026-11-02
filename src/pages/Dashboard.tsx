@@ -3,7 +3,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { Card, CardHeader, ErrorNote, Meter, PageHeader, Spinner, Stat } from '@/components/ui';
 import { WeekTracker } from '@/components/WeekTracker';
 import { useTerm } from '@/lib/TermContext';
-import { EXAM_STEPS, examProgress, stepState } from '@/lib/workflow';
+import { EXAM_STEPS, examProgress, marksPublished, stepState } from '@/lib/workflow';
 
 /** Department overview, open to all faculty: progress only. Workload and setup gaps are for the HOD and admins. */
 export default function Dashboard() {
@@ -17,7 +17,7 @@ export default function Dashboard() {
   const finished = theory.filter((o) => !examProgress(data.tasks.filter((t) => t.offering_id === o.id)).current).length;
   const items = data.items.filter((i) => i.status !== 'cancelled');
   const held = items.filter((i) => i.status === 'held').length;
-  const dated = items.filter((i) => i.held_on).length;
+  const published = items.filter((i) => marksPublished(i.marks_status)).length;
   const byCourse = data.offerings.map((o) => {
     const its = items.filter((i) => i.offering_id === o.id);
     return { o, c: courseOf(o), n: its.length, pub: its.filter((i) => i.status === 'held').length };
@@ -41,7 +41,7 @@ export default function Dashboard() {
         <Stat label="Courses" value={data.offerings.length} sub={`${theory.length} with a term final`} />
         <Stat label="Term finals complete" value={`${finished}/${theory.length}`} />
         <Stat label="Assessments held" value={`${held}/${items.length}`} />
-        <Stat label="Assessments dated" value={`${dated}/${items.length}`} />
+        <Stat label="Marks published" value={`${published}/${items.length}`} />
       </div>
       <div className="grid gap-5 xl:grid-cols-2 [&>*]:min-w-0">
         <Card>

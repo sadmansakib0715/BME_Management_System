@@ -17,6 +17,11 @@
     --bad: 185 28 28; --bad-soft: 254 236 236; --bad-fg: 255 255 255;
     --info: 72 88 140; --info-soft: 233 236 244;
     --shade: 58 58 58;
+    /* Status progress: mild red (first step) → orange → yellow → green (done). */
+    --p0: 166 50 50; --p0-soft: 252 233 231;
+    --p1: 158 80 14; --p1-soft: 253 237 219;
+    --p2: 118 96 8; --p2-soft: 249 243 205;
+    --p3: 38 110 62; --p3-soft: 225 243 229;
     color-scheme: light;
   }
   :root[data-theme="dark"] {
@@ -30,6 +35,10 @@
     --bad: 248 140 120; --bad-soft: 66 30 26; --bad-fg: 50 12 8;
     --info: 158 175 228; --info-soft: 38 43 62;
     --shade: 0 0 0;
+    --p0: 246 162 152; --p0-soft: 72 34 32;
+    --p1: 243 182 122; --p1-soft: 68 46 22;
+    --p2: 230 212 122; --p2-soft: 58 52 22;
+    --p3: 142 212 162; --p3-soft: 30 58 40;
     color-scheme: dark;
   }
   html { -webkit-text-size-adjust: 100%; }
@@ -57,6 +66,12 @@
   :where(.table) tbody tr { @apply transition-colors duration-150; }
   :where(.table) tbody tr:hover { @apply bg-sunken/50; }
   .link { @apply text-brand-ink font-medium underline-offset-2 hover:underline cursor-pointer; }
+  /* Status colours by progress (src/lib/workflow.ts progressTone). Text always says the status too. */
+  .prog-0 { background-color: rgb(var(--p0-soft)); color: rgb(var(--p0)); border-color: rgb(var(--p0) / 0.35); }
+  .prog-1 { background-color: rgb(var(--p1-soft)); color: rgb(var(--p1)); border-color: rgb(var(--p1) / 0.35); }
+  .prog-2 { background-color: rgb(var(--p2-soft)); color: rgb(var(--p2)); border-color: rgb(var(--p2) / 0.35); }
+  .prog-3 { background-color: rgb(var(--p3-soft)); color: rgb(var(--p3)); border-color: rgb(var(--p3) / 0.35); }
+  .prog-n { background-color: rgb(var(--sunken)); color: rgb(var(--muted)); border-color: rgb(var(--line-strong)); }
   .kbd { @apply font-mono text-2xs px-1.5 py-0.5 rounded border border-line bg-sunken text-muted; }
   /* Click feedback (src/lib/tap.ts): squish, spring back, and a slate ripple. Wide targets get a gentler squish. */
   .tap    { animation: tap-press 340ms cubic-bezier(.34,1.56,.64,1), tap-ripple 480ms ease-out; }
