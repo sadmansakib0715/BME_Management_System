@@ -22,6 +22,16 @@
     --p1: 158 80 14; --p1-soft: 253 237 219;
     --p2: 118 96 8; --p2-soft: 249 243 205;
     --p3: 38 110 62; --p3-soft: 225 243 229;
+    /* Progress-tree stage hues (src/components/ProgressTree.tsx): one per lifecycle stage, readable on their soft fills. */
+    --tone-setup: 79 70 229; --tone-setup-soft: 238 240 255;
+    --tone-assess: 3 105 161; --tone-assess-soft: 224 242 254;
+    --tone-exam: 109 40 217; --tone-exam-soft: 243 237 255;
+    --tone-results: 180 83 9; --tone-results-soft: 254 243 214;
+    --tone-obe: 15 118 110; --tone-obe-soft: 220 247 243;
+    --tone-close: 190 18 60; --tone-close-soft: 255 230 235;
+    --tone-group: 71 85 105; --tone-group-soft: 236 240 245;
+    --tone-course: 155 19 19; --tone-course-soft: 251 236 236;
+    --root-a: 155 19 19; --root-b: 104 12 32;
     color-scheme: light;
   }
   :root[data-theme="dark"] {
@@ -39,6 +49,15 @@
     --p1: 243 182 122; --p1-soft: 68 46 22;
     --p2: 230 212 122; --p2-soft: 58 52 22;
     --p3: 142 212 162; --p3-soft: 30 58 40;
+    --tone-setup: 165 180 252; --tone-setup-soft: 42 44 82;
+    --tone-assess: 125 211 252; --tone-assess-soft: 22 50 68;
+    --tone-exam: 196 181 253; --tone-exam-soft: 52 40 84;
+    --tone-results: 252 211 77; --tone-results-soft: 68 50 20;
+    --tone-obe: 94 234 212; --tone-obe-soft: 18 60 56;
+    --tone-close: 253 164 175; --tone-close-soft: 76 28 40;
+    --tone-group: 176 192 212; --tone-group-soft: 44 50 60;
+    --tone-course: 246 170 170; --tone-course-soft: 70 28 28;
+    --root-a: 168 52 52; --root-b: 96 24 40;
     color-scheme: dark;
   }
   html { -webkit-text-size-adjust: 100%; }
@@ -72,31 +91,73 @@
   .prog-2 { background-color: rgb(var(--p2-soft)); color: rgb(var(--p2)); border-color: rgb(var(--p2) / 0.35); }
   .prog-3 { background-color: rgb(var(--p3-soft)); color: rgb(var(--p3)); border-color: rgb(var(--p3) / 0.35); }
   .prog-n { background-color: rgb(var(--sunken)); color: rgb(var(--muted)); border-color: rgb(var(--line-strong)); }
-  /* Progress tree (src/components/ProgressTree.tsx): horizontal, root on the left, elbow connectors. */
+  /* Progress tree (src/components/ProgressTree.tsx): horizontal, root on the left, elbow connectors tinted by stage.
+     Each stage <li> sets --hue/--hue-soft (tone-* classes); everything under it inherits. State always shows as text and dot shape too. */
+  .ptree { --conn: rgb(var(--hue, var(--line-strong)) / .65); }
   .ptree, .ptree li { display: flex; align-items: center; }
-  .ptree ul { display: flex; flex-direction: column; position: relative; padding-left: 1.25rem; }
-  .ptree ul::before { content: ''; position: absolute; left: 0; top: 50%; width: 1.25rem; border-top: 1px solid rgb(var(--line-strong)); }
-  .ptree li { position: relative; padding: .2rem 0 .2rem 1rem; }
-  .ptree li::before { content: ''; position: absolute; left: 0; top: 50%; width: 1rem; border-top: 1px solid rgb(var(--line-strong)); }
-  .ptree li::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; border-left: 1px solid rgb(var(--line-strong)); }
+  .ptree li { --conn: rgb(var(--hue, var(--line-strong)) / .65); }
+  .ptree ul { display: flex; flex-direction: column; position: relative; padding-left: 1.5rem; }
+  .ptree ul::before { content: ''; position: absolute; left: 0; top: 50%; width: 1.5rem; border-top: 1.5px solid var(--conn); }
+  .ptree li { position: relative; padding: .25rem 0 .25rem 1rem; }
+  .ptree li::before { content: ''; position: absolute; left: 0; top: 50%; width: 1rem; border-top: 1.5px solid var(--conn); }
+  .ptree li::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; border-left: 1.5px solid var(--conn); }
   .ptree li:only-child::after { display: none; }
   .ptree li:first-child:not(:only-child)::before, .ptree li:last-child:not(:only-child)::before { display: none; }
-  .ptree li:first-child:not(:only-child)::after { top: 50%; width: 1rem; border-top: 1px solid rgb(var(--line-strong)); border-top-left-radius: 8px; }
-  .ptree li:last-child:not(:only-child)::after { bottom: 50%; width: 1rem; border-bottom: 1px solid rgb(var(--line-strong)); border-bottom-left-radius: 8px; }
-  .ptree-node { @apply relative z-[1] inline-flex items-center gap-2 max-w-[15rem] rounded border border-line bg-surface px-2.5 py-1.5 text-sm font-medium
-                text-ink whitespace-nowrap transition-colors duration-150 hover:border-line-strong cursor-pointer; }
-  .ptree-root { @apply cursor-default border-line-strong bg-sunken px-3 py-2; }
-  .ptree-node-locked, .ptree-node-na { @apply text-subtle font-normal; }
-  .ptree-node-returned { border-color: rgb(var(--warn) / .45); }
-  .ptree-node-open { border-color: rgb(var(--ink) / .5); background: rgb(var(--sunken)); }
-  .ptree-next { box-shadow: 0 0 0 2px rgb(var(--brand) / .55); animation: ptree-call 1.6s ease-out 2; }
+  .ptree li:first-child:not(:only-child)::after { top: 50%; width: 1rem; border-top: 1.5px solid var(--conn); border-top-left-radius: 10px; }
+  .ptree li:last-child:not(:only-child)::after { bottom: 50%; width: 1rem; border-bottom: 1.5px solid var(--conn); border-bottom-left-radius: 10px; }
+
+  .tone-setup   { --hue: var(--tone-setup);   --hue-soft: var(--tone-setup-soft); }
+  .tone-assess  { --hue: var(--tone-assess);  --hue-soft: var(--tone-assess-soft); }
+  .tone-exam    { --hue: var(--tone-exam);    --hue-soft: var(--tone-exam-soft); }
+  .tone-results { --hue: var(--tone-results); --hue-soft: var(--tone-results-soft); }
+  .tone-obe     { --hue: var(--tone-obe);     --hue-soft: var(--tone-obe-soft); }
+  .tone-close   { --hue: var(--tone-close);   --hue-soft: var(--tone-close-soft); }
+  .tone-group   { --hue: var(--tone-group);   --hue-soft: var(--tone-group-soft); }
+  .tone-course  { --hue: var(--tone-course);  --hue-soft: var(--tone-course-soft); }
+
+  .ptree-node { @apply relative z-[1] inline-flex items-center gap-2 max-w-[16rem] rounded-md border px-2.5 py-1.5 text-left text-sm font-medium whitespace-nowrap
+                cursor-pointer transition-[transform,box-shadow,border-color,background-color] duration-150;
+                border-color: rgb(var(--line-strong)); background: rgb(var(--surface)); color: rgb(var(--ink)); box-shadow: 0 1px 2px rgb(var(--shade) / .06); }
+  .ptree-node:hover { transform: translateY(-1px); box-shadow: 0 4px 12px -4px rgb(var(--hue, var(--shade)) / .35); }
+  /* Root: maroon gradient. */
+  .ptree-root { @apply cursor-default px-3.5 py-2 rounded-lg font-semibold; color: #fff; border-color: transparent;
+                background: linear-gradient(135deg, rgb(var(--root-a)), rgb(var(--root-b))); box-shadow: 0 6px 18px -8px rgb(var(--root-a) / .7); }
+  .ptree-root:hover { transform: none; }
+  .ptree-root .ptree-sub { color: rgb(255 255 255 / .78); }
+  /* Branches: tinted with their stage hue, with a small progress bar. */
+  .ptree-branch { font-weight: 600; color: rgb(var(--hue, var(--ink))); background: rgb(var(--hue-soft, var(--sunken)));
+                  border-color: rgb(var(--hue, var(--line-strong)) / .4); }
+  .ptree-course { color: rgb(var(--ink)); background: rgb(var(--surface)); border-color: rgb(var(--hue) / .35); box-shadow: inset 3px 0 0 rgb(var(--hue)), 0 1px 2px rgb(var(--shade) / .06); }
+  .ptree-bar { @apply block h-1 w-full mt-1 rounded-full overflow-hidden; background: rgb(var(--hue, var(--subtle)) / .18); }
+  .ptree-bar > span { @apply block h-full rounded-full transition-[width] duration-500; background: rgb(var(--hue, var(--ok))); }
+  .ptree-count { @apply tabular text-2xs font-semibold rounded-full px-1.5 py-px; background: rgb(var(--hue, var(--subtle)) / .14); color: rgb(var(--hue, var(--muted))); }
+  /* Steps: filled by state. */
+  .ptree-s-done     { background: rgb(var(--ok-soft)); border-color: rgb(var(--ok) / .4); }
+  .ptree-s-active   { background: rgb(var(--info-soft)); border-color: rgb(var(--info) / .45); }
+  .ptree-s-returned { background: rgb(var(--warn-soft)); border-color: rgb(var(--warn) / .55); }
+  .ptree-s-ready    { border-color: rgb(var(--hue, var(--brand)) / .45); box-shadow: inset 3px 0 0 rgb(var(--hue, var(--brand))), 0 1px 2px rgb(var(--shade) / .06); }
+  .ptree-s-locked   { @apply font-normal; color: rgb(var(--subtle)); background: rgb(var(--sunken) / .6); border-style: dashed; box-shadow: none; }
+  .ptree-s-na       { @apply font-normal; color: rgb(var(--subtle)); background: transparent; border-style: dotted; opacity: .7; box-shadow: none; }
+  .ptree-node-open  { outline: 2px solid rgb(var(--hue, var(--brand)) / .6); outline-offset: 2px; }
+  .ptree-next { box-shadow: 0 0 0 2px rgb(var(--brand) / .6); animation: ptree-call 1.6s ease-out 2; }
+  .ptree-sub { @apply block truncate text-2xs font-normal; color: rgb(var(--muted)); }
+  /* Dots: shape and colour per state. */
   .ptree-dot { @apply inline-block size-2.5 shrink-0 rounded-full; }
-  .ptree-dot-done { background: rgb(var(--ok)); }
+  .ptree-dot-done { background: rgb(var(--ok)); box-shadow: 0 0 0 2px rgb(var(--ok) / .2); }
   .ptree-dot-active { background: conic-gradient(rgb(var(--info)) 0 50%, transparent 0); box-shadow: inset 0 0 0 1.5px rgb(var(--info)); }
   .ptree-dot-returned { background: rgb(var(--warn)); border-radius: 2px; transform: rotate(45deg) scale(.85); }
-  .ptree-dot-ready { box-shadow: inset 0 0 0 1.5px rgb(var(--brand)); }
+  .ptree-dot-ready { box-shadow: inset 0 0 0 2px rgb(var(--hue, var(--brand))); }
   .ptree-dot-locked { box-shadow: inset 0 0 0 1.5px rgb(var(--line-strong)); background: rgb(var(--sunken)); }
-  .ptree-dot-na { background: rgb(var(--line)); }
+  .ptree-dot-na { background: rgb(var(--line-strong)); }
+  .ptree-root .ptree-dot { box-shadow: 0 0 0 2px rgb(255 255 255 / .55); }
+  /* Header: one bar split by state. */
+  .ptree-seg { @apply flex h-2 w-full overflow-hidden rounded-full; background: rgb(var(--sunken)); }
+  .ptree-seg > span { @apply h-full transition-[width] duration-500; }
+  .ptree-fill-done { background: rgb(var(--ok)); }
+  .ptree-fill-active { background: rgb(var(--info)); }
+  .ptree-fill-returned { background: rgb(var(--warn)); }
+  .ptree-fill-ready { background: rgb(var(--brand) / .55); }
+  .ptree-fill-locked { background: rgb(var(--line-strong)); }
   .kbd { @apply font-mono text-2xs px-1.5 py-0.5 rounded border border-line bg-sunken text-muted; }
   /* Click feedback (src/lib/tap.ts): squish, spring back, and a slate ripple. Wide targets get a gentler squish. */
   .tap    { animation: tap-press 340ms cubic-bezier(.34,1.56,.64,1), tap-ripple 480ms ease-out; }

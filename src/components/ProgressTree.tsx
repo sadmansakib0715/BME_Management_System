@@ -3,7 +3,7 @@ import { Check, ChevronRight, ExternalLink, Loader2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { nextActions, type EditTarget, type NodeState, type RolledNode } from '@/lib/progressTree';
+import { nextActions, type EditTarget, type NodeState, type RolledNode, type Tone } from '@/lib/progressTree';
 
 const STATE_TEXT: Record<NodeState, string> = {
   done: 'Done', active: 'In progress', returned: 'Needs a fix', ready: 'Ready to start', locked: 'Waiting', na: 'Not used',
@@ -21,9 +21,31 @@ export interface ProgressTreeProps {
   foldAt?: number;
 }
 
+// Class names are written out in full so Tailwind keeps them in the build.
+const DOT: Record<NodeState, string> = {
+  done: 'ptree-dot ptree-dot-done', active: 'ptree-dot ptree-dot-active', returned: 'ptree-dot ptree-dot-returned',
+  ready: 'ptree-dot ptree-dot-ready', locked: 'ptree-dot ptree-dot-locked', na: 'ptree-dot ptree-dot-na',
+};
+const STEP: Record<NodeState, string> = {
+  done: 'ptree-s-done', active: 'ptree-s-active', returned: 'ptree-s-returned', ready: 'ptree-s-ready', locked: 'ptree-s-locked', na: 'ptree-s-na',
+};
+const FILL: Partial<Record<NodeState, string>> = {
+  done: 'ptree-fill-done', active: 'ptree-fill-active', returned: 'ptree-fill-returned', ready: 'ptree-fill-ready', locked: 'ptree-fill-locked',
+};
+const TONE: Record<Tone, string> = {
+  setup: 'tone-setup', assess: 'tone-assess', exam: 'tone-exam', results: 'tone-results', obe: 'tone-obe', close: 'tone-close', group: 'tone-group', course: 'tone-course',
+};
+
 /** Dot per state. Shape differs as well as colour, so the tree reads without colour. */
 function Dot({ state }: { state: NodeState }) {
-  return <span aria-hidden className={clsx('ptree-dot', `ptree-dot-${state}`)} />;
+  return <span aria-hidden className={DOT[state]} />;
+}
+
+/** Leaf counts per state, for the header bar. */
+function countLeaves(n: RolledNode, out: Partial<Record<NodeState, number>> = {}) {
+  if (!n.children) out[n.state] = (out[n.state] ?? 0) + 1;
+  else n.children.forEach((c) => countLeaves(c, out));
+  return out;
 }
 
 // ---------------------------------------------------------------- dropdown
@@ -115,16 +137,19 @@ interface Ctx { nextId?: string; foldAt?: number; openMap: Record<string, boolea
 function NodeChip({ n, isRoot, open, ctx }: { n: RolledNode; isRoot?: boolean; open: boolean; ctx: Ctx }) {
   const parent = !!n.children;
   const showHint = !parent && (n.state === 'active' || n.state === 'returned') && n.hint;
-  const cls = clsx('ptree-node', `ptree-node-${n.state}`, isRoot && 'ptree-root', n.id === ctx.nextId && 'ptree-next', ctx.menuId === n.id && 'ptree-node-open');
+  const pct = n.total ? Math.round((n.done / n.total) * 100) : 0;
+  const cls = clsx('ptree-node', isRoot ? 'ptree-root' : parent ? (n.tone === 'course' ? 'ptree-course' : 'ptree-branch') : STEP[n.state],
+    n.id === ctx.nextId && 'ptree-next', ctx.menuId === n.id && 'ptree-node-open');
   const body = (
     <>
       <Dot state={n.state} />
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="block truncate">{n.label}</span>
-        {(isRoot || showHint) && n.hint && <span className="block truncate text-2xs text-muted font-normal">{n.hint}</span>}
+        {(isRoot || showHint) && n.hint && <span className="ptree-sub">{n.hint}</span>}
+        {parent && !isRoot && <span className="ptree-bar" aria-hidden><span style={{ width: `${pct}%` }} /></span>}
       </span>
-      {parent && !isRoot && <span className="tabular text-2xs text-subtle ml-1">{n.done}/{n.total}</span>}
-      {parent && !isRoot && <ChevronRight aria-hidden className={clsx('size-3.5 text-subtle transition-transform duration-150', open && 'rotate-180')} />}
+      {parent && !isRoot && <span className="ptree-count ml-1">{n.done}/{n.total}</span>}
+      {parent && !isRoot && <ChevronRight aria-hidden className={clsx('size-3.5 opacity-60 transition-transform duration-150', open && 'rotate-180')} />}
     </>
   );
   const title = `${n.label}: ${STATE_TEXT[n.state]}${n.hint ? ` (${n.hint})` : ''}`;
@@ -141,7 +166,7 @@ function Branch({ n, depth, ctx }: { n: RolledNode; depth: number; ctx: Ctx }) {
     <>
       <NodeChip n={n} isRoot={depth === 0} open={open} ctx={ctx} />
       {n.children && open && (
-        <ul>{n.children.map((c) => <li key={c.id}><Branch n={c} depth={depth + 1} ctx={ctx} /></li>)}</ul>
+        <ul>{n.children.map((c) => <li key={c.id} className={c.tone && TONE[c.tone]}><Branch n={c} depth={depth + 1} ctx={ctx} /></li>)}</ul>
       )}
     </>
   );
@@ -153,6 +178,8 @@ export default function ProgressTree({ root, onPick, canEdit, actions, foldAt }:
   const [menu, setMenu] = useState<{ id: string; el: HTMLElement } | null>(null);
   const next = nextActions(root);
   const pct = root.total ? Math.round((root.done / root.total) * 100) : 0;
+  const counts = countLeaves(root);
+  const leaves = Object.entries(counts).filter(([s]) => s !== 'na').reduce((a, [, v]) => a + v, 0);
   const find = (n: RolledNode, id: string): RolledNode | undefined => n.id === id ? n : n.children?.map((c) => find(c, id)).find(Boolean);
   const menuNode = menu && find(root, menu.id);   // read fresh each render, so the dropdown shows the saved status
   const openMenu = (n: RolledNode, el: HTMLElement) => setMenu((m) => (m?.id === n.id && m.el === el ? null : { id: n.id, el }));
@@ -161,11 +188,14 @@ export default function ProgressTree({ root, onPick, canEdit, actions, foldAt }:
   return (
     <div className="card">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 border-b border-line">
-        <div className="flex items-center gap-3 min-w-[12rem]">
-          <div className="h-1.5 w-28 rounded-full bg-sunken overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Progress">
-            <div className="h-full bg-ok transition-[width] duration-500" style={{ width: `${pct}%` }} />
+        <div className="flex items-center gap-3 min-w-[15rem]">
+          <span className="text-2xl font-semibold tabular tracking-tight">{pct}<span className="text-sm text-muted font-medium">%</span></span>
+          <div className="flex-1 min-w-[8rem]">
+            <div className="ptree-seg" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Progress">
+              {(['done', 'active', 'returned', 'ready', 'locked'] as NodeState[]).map((s) => counts[s] ? <span key={s} className={FILL[s]} style={{ width: `${(counts[s]! / leaves) * 100}%` }} /> : null)}
+            </div>
+            <span className="block mt-1 text-2xs tabular text-muted">{root.done} of {root.total} steps done</span>
           </div>
-          <span className="text-sm tabular text-muted">{root.done} of {root.total} steps done</span>
         </div>
         <div className="flex flex-1 flex-wrap items-center gap-2 text-sm min-w-0">
           <span className="text-muted">Next:</span>
@@ -186,7 +216,7 @@ export default function ProgressTree({ root, onPick, canEdit, actions, foldAt }:
       </div>
       <ul className="flex flex-wrap gap-x-4 gap-y-1 px-4 pb-3 text-2xs text-muted" aria-label="Legend">
         {(['done', 'active', 'returned', 'ready', 'locked'] as NodeState[]).map((s) => (
-          <li key={s} className="inline-flex items-center gap-1.5"><Dot state={s} />{STATE_TEXT[s]}</li>
+          <li key={s} className="inline-flex items-center gap-1.5"><Dot state={s} />{STATE_TEXT[s]}<span className="tabular text-subtle">{counts[s] ?? 0}</span></li>
         ))}
         <li className="ml-auto text-subtle">Click a branch to open it, or a step to change its status.</li>
       </ul>

@@ -21,9 +21,13 @@ export type EditTarget = { offering: string } & (
 /** One dropdown group: the options for one field, its current value, and options that must be set from their own page. */
 export interface EditGroup { label: string; target: EditTarget; value: string; options: StatusOption[]; elsewhere?: string[] }
 
+/** Colour family of a branch: each lifecycle stage has its own hue, which everything under it inherits. */
+export type Tone = 'setup' | 'assess' | 'exam' | 'results' | 'obe' | 'close' | 'group' | 'course';
+
 export interface PNode {
   id: string;
   label: string;
+  tone?: Tone;
   state?: NodeState;        // set on leaves; parents are rolled up
   hint?: string;            // one short line: status text, owner, date
   to?: string;              // route inside the app
@@ -73,7 +77,7 @@ export function nextActions(root: RolledNode, limit = 3): { node: RolledNode; pa
   let order = 0;
   const walk = (n: RolledNode, path: string[]) => {
     if (!n.children) { if (n.state in URGENCY) out.push({ node: n, path, order: order++ }); return; }
-    n.children.forEach((c) => walk(c, [...path, n.label]));
+    n.children.forEach((c) => walk(c, n.tone === 'group' ? path : [...path, n.label]));   // level groups would only lengthen the path
   };
   walk(root, []);
   return out.sort((a, b) => URGENCY[a.node.state]! - URGENCY[b.node.state]! || a.order - b.order)
@@ -117,7 +121,7 @@ export function courseNode(offering: Offering, course: Course, data: TermData, o
   // Setup
   const cos = obe?.cos ?? [];
   const mapped = cos.length > 0 && cos.every((c) => obe!.coPo.some((m) => m.co_id === c.id));
-  const setup: PNode = { id: 'setup', label: 'Setup', children: [
+  const setup: PNode = { id: 'setup', label: 'Setup', tone: 'setup', children: [
     { id: 'teachers', label: 'Teachers', state: hasTeachers ? 'done' : 'ready', hint: hasTeachers ? 'Assigned' : 'Not assigned', ...page.overview },
     { id: 'outline', label: 'Course outline', state: fromOpts(OUTLINE_STATUS, rec?.outline_status, 'prepared'), hint: label(OUTLINE_STATUS, rec?.outline_status), ...page.overview,
       edits: rec ? [{ label: 'Status', target: { offering: id, kind: 'record', field: 'outline_status' }, value: rec.outline_status ?? OUTLINE_STATUS[0].value, options: OUTLINE_STATUS }] : [] },
@@ -144,7 +148,7 @@ export function courseNode(offering: Offering, course: Course, data: TermData, o
       { label: 'Held', target: { offering: id, kind: 'item', itemId: i.id, field: 'status' }, value: i.status, options: ITEM_STATUS, elsewhere: ['postponed'] },
       { label: 'Marks', target: { offering: id, kind: 'item', itemId: i.id, field: 'marks_status' }, value: marksPublished(i.marks_status) ? 'published' : marksUnderEvaluation(i.marks_status) ? 'entering' : 'none', options: MARKS_STATE },
     ] });
-  const assessments: PNode = { id: 'assess', label: 'Assessments', ...page.assess,
+  const assessments: PNode = { id: 'assess', label: 'Assessments', tone: 'assess', ...page.assess,
     children: comps.map((c) => {
       const its = items.filter((i) => i.component_id === c.id).sort((a, b) => a.seq - b.seq);
       return its.length === 1 ? { ...leaf(its[0], c.name), id: c.id }
@@ -170,14 +174,14 @@ export function courseNode(offering: Offering, course: Course, data: TermData, o
   let marksDone: boolean;
   if (isTheory) {
     examBranch = [
-      { id: 'final', label: 'Term final', children: [
+      { id: 'final', label: 'Term final', tone: 'exam', children: [
         { id: 'qp', label: 'Questions', children: [step('qp_a', 'Section A'), step('qp_b', 'Section B')] },
         { id: 'mod', label: 'Moderation', children: [step('mod_1', 'Moderator 1'), step('mod_2', 'Moderator 2')] },
         step('printing', 'Printing'),
         { id: 'scripts', label: 'Script evaluation', children: [step('exam_a', 'Section A'), step('exam_b', 'Section B')] },
         step('scrutiny', 'Scrutiny'),
       ] },
-      { id: 'results', label: 'Gradesheet', children: [step('gs_prep', 'Preparation'), step('gs_scrutiny', 'Scrutiny'), step('hod', 'To HOD')] },
+      { id: 'results', label: 'Gradesheet', tone: 'results', children: [step('gs_prep', 'Preparation'), step('gs_scrutiny', 'Scrutiny'), step('hod', 'To HOD')] },
     ];
     marksDone = stepState(tasks, 'scrutiny') === 'done';
   } else {
@@ -185,7 +189,7 @@ export function courseNode(offering: Offering, course: Course, data: TermData, o
     const allPublished = items.length > 0 && items.every((i) => i.status === 'cancelled' || marksPublished(i.marks_status));
     const prep = gated({ id: 'sg_prep', label: 'Preparation', state: fromOpts(SG_PREP_STATUS, gs?.prep_status, 'uploaded_biis'), hint: label(SG_PREP_STATUS, gs?.prep_status), ...page.exam,
       edits: [{ label: 'Status', target: { offering: id, kind: 'gradesheet', part: 'prep' }, value: gs?.prep_status ?? 'not_started', options: SG_PREP_STATUS }] }, allPublished, 'All marks published');
-    examBranch = [{ id: 'results', label: 'Gradesheet', children: [prep,
+    examBranch = [{ id: 'results', label: 'Gradesheet', tone: 'results', children: [prep,
       gated({ id: 'sg_scr', label: 'Scrutiny', state: fromOpts(SG_SCRUTINY_STATUS, gs?.scrutiny_status, 'scrutinized'), hint: label(SG_SCRUTINY_STATUS, gs?.scrutiny_status), ...page.exam,
         edits: [{ label: 'Status', target: { offering: id, kind: 'gradesheet', part: 'scrutiny' }, value: gs?.scrutiny_status ?? 'not_started', options: SG_SCRUTINY_STATUS }] }, prep.state === 'done', 'Gradesheet preparation'),
     ] }];
@@ -199,7 +203,7 @@ export function courseNode(offering: Offering, course: Course, data: TermData, o
   const poVals = poCodes.filter((p) => att.some((a) => a.outcome_type === 'PO' && a.code === p && a.value != null)).length;
   const coState: NodeState = cos.length && coVals === cos.length ? 'done' : coVals ? 'active' : 'ready';
   const poState: NodeState = poCodes.length && poVals === poCodes.length ? 'done' : poVals ? 'active' : 'ready';
-  const obeBranch: PNode = { id: 'obe', label: 'OBE', children: [
+  const obeBranch: PNode = { id: 'obe', label: 'OBE', tone: 'obe', children: [
     gated({ id: 'co_att', label: 'CO attainment', state: coState, hint: `${coVals}/${cos.length} COs`, ...page.obe }, marksDone && cos.length > 0, isTheory ? 'Term-final scrutiny' : 'All marks published'),
     gated({ id: 'po_att', label: 'PO attainment', state: poState, hint: `${poVals}/${poCodes.length} POs`, ...page.obe }, coState === 'done', 'CO attainment'),
     ...(course.is_culminating ? [gated({ id: 'prog_po', label: 'Program PO', state: poState === 'done' ? 'done' : 'ready', hint: 'Feeds the batch PO', to: '/outcomes?tab=program', toLabel: 'Program PO' }, poState === 'done', 'PO attainment')] : []),
@@ -210,12 +214,12 @@ export function courseNode(offering: Offering, course: Course, data: TermData, o
   const carState: NodeState = car?.status === 'final' ? 'done' : car ? 'active' : 'ready';
   const file = courseFile({ cos, coPo: obe?.coPo ?? [], attainment: att, car: car ?? null, files: obe?.files ?? [], hasTeachers, hasResolution: !!offering.co_resolution_id });
   const fileDone = file.filter((f) => f.done).length;
-  const close: PNode = { id: 'close', label: 'Close-out', children: [
+  const close: PNode = { id: 'close', label: 'Close-out', tone: 'close', children: [
     gated({ id: 'car', label: 'CAR', state: carState, hint: car ? car.status[0].toUpperCase() + car.status.slice(1) : 'Not started', ...page.obe }, coState === 'done', 'CO attainment'),
     { id: 'file', label: 'Course file', state: fileDone === file.length ? 'done' : fileDone ? 'active' : 'ready', hint: `${fileDone}/${file.length} parts`, ...page.obe },
   ] };
 
-  return scoped({ id: 'course', label: course.code, hint: course.title, to: base, toLabel: course.code, children: [setup, assessments, ...examBranch, obeBranch, close] }, id);
+  return scoped({ id: 'course', label: course.code, tone: 'course', hint: course.title, to: base, toLabel: course.code, children: [setup, assessments, ...examBranch, obeBranch, close] }, id);
 }
 
 export const buildCourseTree = (offering: Offering, course: Course, data: TermData, obe: TreeObe | undefined): RolledNode =>
@@ -232,6 +236,6 @@ export function obeSlice(obe: ObeTerm, offeringId: string): TreeObe {
 export function buildForest(rootLabel: string, rootHint: string | undefined, courses: { node: PNode; group?: string }[]): RolledNode {
   const groups = [...new Set(courses.map((c) => c.group))];
   const children = groups.length === 1 && groups[0] === undefined ? courses.map((c) => c.node)
-    : groups.map((g) => ({ id: `group:${g ?? 'other'}`, label: g ?? 'Other', children: courses.filter((c) => c.group === g).map((c) => c.node) }));
+    : groups.map((g) => ({ id: `group:${g ?? 'other'}`, label: g ?? 'Other', tone: 'group' as const, children: courses.filter((c) => c.group === g).map((c) => c.node) }));
   return rollUp({ id: 'forest', label: rootLabel, hint: rootHint, children: children.length ? children : [{ id: 'none', label: 'No courses', state: 'na' }] });
 }
