@@ -49,7 +49,7 @@ export default function Courses() {
                   const hasExam = data.exam.some((x) => x.offering_id === o.id);
                   const p = examProgress(data.tasks.filter((t) => t.offering_id === o.id));
                   const items = data.items.filter((i) => i.offering_id === o.id && i.status !== 'cancelled');
-                  const published = items.filter((i) => ['published', 'locked'].includes(i.marks_status)).length;
+                  const held = items.filter((i) => i.status === 'held').length;
                   const rec = data.records.find((r) => r.offering_id === o.id);
                   return (
                     <tr key={o.id}>
@@ -59,7 +59,7 @@ export default function Courses() {
                       <td className="text-2xs text-muted">{rec ? labelOf(OUTLINE_STATUS, rec.outline_status) : '—'}</td>
                       <td>
                         {hasExam ? <><div className="text-2xs text-muted mb-1">Exam: {p.current ? p.current.short : 'Complete'} · {p.done}/{p.total}</div><Meter value={p.done} max={p.total} label={`${c.code} exam progress`} /></>
-                          : items.length ? <><div className="text-2xs text-muted mb-1">Marks published {published}/{items.length}</div><Meter value={published} max={items.length} label={`${c.code} marks progress`} /></>
+                          : items.length ? <><div className="text-2xs text-muted mb-1">Assessments held {held}/{items.length}</div><Meter value={held} max={items.length} label={`${c.code} assessments held`} /></>
                           : <span className="text-2xs text-subtle">No assessments yet</span>}
                       </td>
                     </tr>

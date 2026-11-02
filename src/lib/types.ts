@@ -24,8 +24,6 @@ export interface PO { code: string; no: number; title: string; statement: string
 export interface PEO { code: string; statement: string; }
 export interface CourseOutcome { id: string; offering_id: string; code: string; statement: string; domain: 'cognitive' | 'affective' | 'psychomotor'; level: number; sort: number; }
 export interface CoPo { co_id: string; po_code: string; strength: 1 | 2 | 3; }
-export interface Student { id: string; student_no: string; name: string; batch: string | null; }
-export interface Enrolment { offering_id: string; student_id: string; section_id: string | null; }
 
 export type ComponentKind = 'attendance' | 'class_test' | 'term_final' | 'lab_report' | 'lab_test' | 'quiz' | 'viva' | 'presentation' | 'demonstration' | 'project' | 'assignment' | 'other';
 export interface AssessmentComponent { id: string; offering_id: string; kind: ComponentKind; name: string; item_count: number; marks_each: number; weight: number; best_n: number | null; per_section: boolean; sort: number; }
@@ -33,6 +31,3 @@ export type ItemStatus = 'planned' | 'scheduled' | 'held' | 'postponed' | 'cance
 export type MarksStatus = 'none' | 'entering' | 'verified' | 'published' | 'locked';
 export interface AssessmentItem { id: string; component_id: string; offering_id: string; section_id: string | null; seq: number; title: string; held_on: string | null; held_time: string | null; total_marks: number; status: ItemStatus; marks_status: MarksStatus; responsible: string | null; syllabus: string | null; }
 export interface ItemDateHistory { id: string; item_id: string; old_date: string | null; new_date: string | null; reason: string | null; changed_by: string | null; changed_at: string; }
-export interface Question { id: string; item_id: string; label: string; max_marks: number; co_id: string | null; sort: number; }
-export interface Mark { question_id: string; student_id: string; value: number | null; flag: 'AB' | 'EX' | null; }
-export interface AttainmentSettings { term_id: string; x_pct: number; y_pct: number; level1: number; level2: number; level3: number; }

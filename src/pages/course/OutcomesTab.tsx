@@ -15,13 +15,12 @@ const LEVELS: Record<CourseOutcome['domain'], string[]> = {
 };
 type DraftCo = Pick<CourseOutcome, 'code' | 'statement' | 'domain' | 'level'> & { id?: string; tmp?: string; map: Record<string, number> };
 
-export default function OutcomesTab({ offering, data }: TabProps) {
+export default function OutcomesTab({ offering }: TabProps) {
   const { me, isAdmin } = useAuth();
   const { teachersOf } = useTerm();
   const toast = useToast();
   const canEdit = isAdmin || teachersOf(offering.id).includes(me?.facultyId ?? '');
-  const itemIds = data.items.filter((i) => i.offering_id === offering.id).map((i) => i.id);
-  const obe = useCourseObe(offering.id, itemIds);
+  const obe = useCourseObe(offering.id);
   const pos = usePOs();
 
   const initial = useMemo<DraftCo[]>(() => (obe.data?.cos ?? []).map((c) => ({ id: c.id, code: c.code, statement: c.statement, domain: c.domain, level: c.level,
@@ -48,11 +47,9 @@ export default function OutcomesTab({ offering, data }: TabProps) {
   if (obe.isLoading || pos.isLoading) return <Spinner />;
   if (obe.error || pos.error) return <ErrorNote error={obe.error ?? pos.error} />;
   const poList = pos.data!.pos;
-  const assessed = new Set((obe.data?.questions ?? []).map((q) => q.co_id));
   const warnings = cos.flatMap((c, i) => [
     !c.statement.trim() && `CO${i + 1} has no statement.`,
     Object.values(c.map).every((v) => !v) && `CO${i + 1} is not mapped to any PO.`,
-    c.id && obe.data?.canSeeMarks && !assessed.has(c.id) && `CO${i + 1} is not measured by any question yet.`,
   ].filter(Boolean) as string[]);
   const set = (i: number, patch: Partial<DraftCo>) => setCos((x) => x.map((c, j) => (j === i ? { ...c, ...patch } : c)));
 
@@ -104,7 +101,7 @@ export default function OutcomesTab({ offering, data }: TabProps) {
           <dl className="mt-2 grid gap-2">{poList.map((p) => <div key={p.code}><dt className="font-semibold inline">{p.code} {p.title}.</dt> <dd className="inline text-muted">{p.statement}{p.k_profiles ? ` (${p.k_profiles})` : ''}</dd></div>)}</dl>
         </details>
       </Card>}
-      {warnings.length > 0 && <Callout tone="warn" title="Check before attainment"><ul className="list-disc pl-5">{warnings.map((w) => <li key={w}>{w}</li>)}</ul></Callout>}
+      {warnings.length > 0 && <Callout tone="warn" title="Check these outcomes"><ul className="list-disc pl-5">{warnings.map((w) => <li key={w}>{w}</li>)}</ul></Callout>}
     </div>
   );
 }

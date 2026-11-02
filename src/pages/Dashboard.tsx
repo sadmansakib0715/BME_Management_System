@@ -17,10 +17,10 @@ export default function Dashboard() {
   const finished = theory.filter((o) => !examProgress(data.tasks.filter((t) => t.offering_id === o.id)).current).length;
   const items = data.items.filter((i) => i.status !== 'cancelled');
   const held = items.filter((i) => i.status === 'held').length;
-  const published = items.filter((i) => ['published', 'locked'].includes(i.marks_status)).length;
+  const dated = items.filter((i) => i.held_on).length;
   const byCourse = data.offerings.map((o) => {
     const its = items.filter((i) => i.offering_id === o.id);
-    return { o, c: courseOf(o), n: its.length, pub: its.filter((i) => ['published', 'locked'].includes(i.marks_status)).length };
+    return { o, c: courseOf(o), n: its.length, pub: its.filter((i) => i.status === 'held').length };
   }).filter((x) => x.c && x.n).sort((a, b) => a.c!.code.localeCompare(b.c!.code));
   const load = faculty.filter((f) => f.status === 'active').map((f) => ({
     f, teach: new Set(data.teachers.filter((t) => t.faculty_id === f.id).map((t) => data.sections.find((s) => s.id === t.section_id)?.offering_id)).size,
@@ -41,7 +41,7 @@ export default function Dashboard() {
         <Stat label="Courses" value={data.offerings.length} sub={`${theory.length} with a term final`} />
         <Stat label="Term finals complete" value={`${finished}/${theory.length}`} />
         <Stat label="Assessments held" value={`${held}/${items.length}`} />
-        <Stat label="Marks published" value={`${published}/${items.length}`} />
+        <Stat label="Assessments dated" value={`${dated}/${items.length}`} />
       </div>
       <div className="grid gap-5 xl:grid-cols-2 [&>*]:min-w-0">
         <Card>
@@ -54,11 +54,11 @@ export default function Dashboard() {
             </li>))}</ul>
         </Card>
         <Card>
-          <CardHeader title="Marks published by course" />
+          <CardHeader title="Assessments held by course" />
           {byCourse.length ? <ul className="divide-y divide-line max-h-96 overflow-y-auto">{byCourse.map(({ o, c, n, pub }) => (
             <li key={o.id} className="px-4 py-2.5 grid grid-cols-[72px_1fr_48px] items-center gap-3">
               <Link to={`/courses/${o.id}`} className="link font-mono text-sm">{c!.code}</Link>
-              <Meter value={pub} max={n} label={`${c!.code} marks published`} />
+              <Meter value={pub} max={n} label={`${c!.code} assessments held`} />
               <span className="text-right text-2xs tabular text-muted">{pub}/{n}</span>
             </li>))}</ul> : <p className="px-4 py-6 text-sm text-muted">No assessment plans yet.</p>}
         </Card>

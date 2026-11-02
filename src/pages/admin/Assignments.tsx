@@ -1,6 +1,6 @@
 import { Plus, X } from 'lucide-react';
 import { useState } from 'react';
-import { Badge, Button, Card, CardHeader, Empty, ErrorNote, PageHeader, SegTabs, Select, Spinner, useToast } from '@/components/ui';
+import { Badge, Button, Card, CardHeader, Empty, ErrorNote, SegTabs, Select, Spinner, useToast } from '@/components/ui';
 import { must, useWrite } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { useTerm } from '@/lib/TermContext';
@@ -11,14 +11,16 @@ type Tab = 'exam' | 'teachers' | 'gradesheets';
 
 export default function Assignments() {
   const { data, loading, error } = useTerm();
-  const [tab, setTab] = useState<Tab>('exam');
+  const [tab, setTab] = useState<Tab>('teachers');
   if (loading) return <Spinner />;
   if (error) return <ErrorNote error={error} />;
   if (!data) return null;
   return (
     <>
-      <PageHeader eyebrow={data.term.name} title="Assignments" description="Who teaches each course and who holds each exam role. The database rejects rule violations, and so does this page before you save."
-        actions={<SegTabs label="Assignment type" value={tab} onChange={setTab} options={[{ value: 'exam', label: 'Exam roles' }, { value: 'teachers', label: 'Teachers' }, { value: 'gradesheets', label: 'Sessional gradesheets' }]} />} />
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <p className="text-sm text-muted max-w-2xl">Who teaches each section and who holds each exam role. Rule conflicts are flagged here and refused by the database.</p>
+        <SegTabs label="Assignment type" value={tab} onChange={setTab} options={[{ value: 'teachers', label: 'Teachers' }, { value: 'exam', label: 'Exam roles' }, { value: 'gradesheets', label: 'Sessional gradesheets' }]} />
+      </div>
       {tab === 'exam' && <ExamRoles />}
       {tab === 'teachers' && <Teachers />}
       {tab === 'gradesheets' && <Gradesheets />}

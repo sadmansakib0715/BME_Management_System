@@ -1,6 +1,6 @@
 import { FileSpreadsheet, Upload } from 'lucide-react';
 import { useState } from 'react';
-import { Badge, Button, Callout, Card, CardHeader, Field, Input, PageHeader, Stat, useToast } from '@/components/ui';
+import { Badge, Button, Callout, Card, CardHeader, Field, Input, Stat, useToast } from '@/components/ui';
 import { rpc, useWrite } from '@/lib/api';
 import type { ImportResult } from '@/lib/importer';
 import { useTerm } from '@/lib/TermContext';
@@ -28,7 +28,7 @@ export default function ImportPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Department" title="Import the Activity Tracker workbook" description="Reads the term spreadsheet in your browser, shows every correction it makes, and writes nothing until you confirm. Re-importing the same term updates it in place." />
+      <p className="text-sm text-muted max-w-3xl mb-4">Fills in the whole term from the Activity Tracker spreadsheet: courses, sections, teachers, exam roles, gradesheet roles, class-test dates and department dates. It is read in your browser, every correction is shown, and nothing is written until you confirm. Re-importing the same term updates it in place.</p>
       <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
         <Card>
           <CardHeader title="1. Choose the file and term" />
@@ -49,7 +49,7 @@ export default function ImportPage() {
               disabled={!res || res.errors.length > 0 || !term.code.trim() || !term.name.trim()}
               onClick={() => run.mutate(undefined, { onSuccess: (r) => { toast('ok', `Imported ${r.offerings} courses and ${r.items} assessment items`); setTermId(r.term_id); }, onError: (e) => toast('bad', e.message) })}>
               Import into {term.name || 'term'}</Button>
-            <p className="text-2xs text-subtle">Rosters, marks and course outcomes are not in the workbook; add them per course after importing.</p>
+            <p className="text-2xs text-subtle">Course outcomes are not in the workbook; teachers add them on each course page. Anything can be adjusted afterwards in the other Term setup tabs.</p>
           </div>
         </Card>
         <div className="space-y-5">

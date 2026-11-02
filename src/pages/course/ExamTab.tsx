@@ -28,7 +28,7 @@ function TheoryExam({ offering, data }: TabProps) {
   const [note, setNote] = useState('');
   const write = useWrite(rpc.setExamTask);
 
-  if (!a) return <Card><Empty title="Exam roles are not assigned yet" action={isAdmin ? <Link className="link" to="/admin/assignments">Assign exam roles</Link> : undefined}>
+  if (!a) return <Card><Empty title="Exam roles are not assigned yet" action={isAdmin ? <Link className="link" to="/admin/term/people">Assign exam roles</Link> : undefined}>
     An admin assigns the question preparers, moderators and scrutinizer; the rest of the chain is derived from them.</Empty></Card>;
 
   const submit = (step: ExamStep, status: string, extra?: { note?: string; half?: 'A' | 'B' }) =>
@@ -95,7 +95,7 @@ function TheoryExam({ offering, data }: TabProps) {
       </Card>
       <div className="space-y-5 min-w-0">
         <Card>
-          <CardHeader title="Exam roles" subtitle={isAdmin ? <Link className="link" to="/admin/assignments">Change assignments</Link> : 'Assigned by the department'} />
+          <CardHeader title="Exam roles" subtitle={isAdmin ? <Link className="link" to="/admin/term/people">Change assignments</Link> : 'Assigned by the department'} />
           <dl className="divide-y divide-line">{roles.map(([r, id, help]) => (
             <div key={r} className="px-4 py-2.5"><dt className="text-2xs text-subtle">{r}</dt><dd className="text-sm font-medium">{nameOf(id)}</dd>{help && <dd className="text-2xs text-subtle">{help}</dd>}</div>))}
           </dl>
@@ -136,17 +136,14 @@ function TheoryExam({ offering, data }: TabProps) {
 function SessionalGradesheet({ offering, data }: TabProps) {
   const { isAdmin } = useAuth();
   const g = data.gradesheets.find((x) => x.offering_id === offering.id);
-  const items = data.items.filter((i) => i.offering_id === offering.id && i.status !== 'cancelled');
-  const pending = items.filter((i) => !['published', 'locked'].includes(i.marks_status)).length;
-  if (!g) return <Card><Empty title="Gradesheet roles are not assigned yet" action={isAdmin ? <Link className="link" to="/admin/assignments">Assign roles</Link> : undefined} /></Card>;
+  if (!g) return <Card><Empty title="Gradesheet roles are not assigned yet" action={isAdmin ? <Link className="link" to="/admin/term/people">Assign roles</Link> : undefined} /></Card>;
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
       <Card>
         <CardHeader title="Sessional gradesheet" subtitle="Preparation, then scrutiny, then to the HOD." />
-        {pending > 0 && <div className="px-4 pt-3"><Callout tone="info">{pending} assessment item{pending > 1 ? 's' : ''} across all sub-sections still need published marks before preparation can start.</Callout></div>}
         <div className="divide-y divide-line">
-          <GradesheetPart offering={offering.id} part="prep" title="Preparation" who={g.preparer} status={g.prep_status} opts={SG_PREP_STATUS} enabled={pending === 0} />
+          <GradesheetPart offering={offering.id} part="prep" title="Preparation" who={g.preparer} status={g.prep_status} opts={SG_PREP_STATUS} enabled />
           <GradesheetPart offering={offering.id} part="scrutiny" title="Scrutiny" who={g.scrutinizer} status={g.scrutiny_status} opts={SG_SCRUTINY_STATUS} enabled={g.prep_status === 'forwarded'} />
         </div>
       </Card>

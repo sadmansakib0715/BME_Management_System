@@ -78,7 +78,6 @@ export function validateAssignment(a: Partial<ExamAssignment>, nameOf: (id: stri
 
 // ------------------------------------------------------------- other status vocabularies
 export const ITEM_STATUS: StatusOption[] = [s('planned', 'Planned'), s('scheduled', 'Scheduled'), s('held', 'Held'), s('postponed', 'Postponed'), s('cancelled', 'Cancelled')];
-export const MARKS_STATUS: StatusOption[] = [s('none', 'No marks'), s('entering', 'Entering'), s('verified', 'Verified'), s('published', 'Published'), s('locked', 'Locked')];
 export const OUTLINE_STATUS: StatusOption[] = [NS, s('under_preparation', 'Under preparation'), s('prepared', 'Prepared'), s('shared', 'Shared with students')];
 export const FEEDBACK_STATUS: StatusOption[] = [NS, s('students_reminded', 'Students reminded'), s('collected', 'Feedback collected')];
 export const CAR_STATUS: StatusOption[] = [NS, s('under_preparation', 'Under preparation'), s('prepared', 'Prepared'), s('final', 'Final')];

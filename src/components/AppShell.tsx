@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { Building2, ClipboardList, Compass, FileUp, LogOut, Menu, Monitor, Moon, Settings2, Sun, Unlock, UserRound, Users, X } from 'lucide-react';
+import { Building2, Compass, LogOut, Menu, Monitor, Moon, Settings2, Sun, Unlock, UserRound, Users, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
@@ -67,10 +67,8 @@ function Sidebar() {
         <Item to="/dashboard" also={DEPT_PATHS} icon={<Building2 className="size-4" />}>Department</Item>
         {isAdmin && <>
           <div className="pt-4 pb-1 px-2.5 text-2xs font-semibold uppercase tracking-wider text-subtle">Administration</div>
-          <Item to="/admin/assignments" icon={<ClipboardList className="size-4" />}>Assignments</Item>
           <Item to="/admin/term" icon={<Settings2 className="size-4" />}>Term setup</Item>
           <Item to="/admin/people" icon={<Users className="size-4" />}>People & access</Item>
-          <Item to="/admin/import" icon={<FileUp className="size-4" />}>Import workbook</Item>
         </>}
       </nav>
       <div className="px-3 pt-3 pb-2 space-y-2">

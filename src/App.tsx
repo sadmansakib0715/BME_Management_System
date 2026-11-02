@@ -13,10 +13,8 @@ const CourseDetail = lazy(() => import('./pages/course/CourseDetail'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 const Outcomes = lazy(() => import('./pages/Outcomes'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Assignments = lazy(() => import('./pages/admin/Assignments'));
 const TermSetup = lazy(() => import('./pages/admin/TermSetup'));
 const People = lazy(() => import('./pages/admin/People'));
-const ImportPage = lazy(() => import('./pages/admin/Import'));
 const Guide = lazy(() => import('./pages/Guide'));
 
 function AdminOnly({ children }: { children: ReactNode }) {
@@ -72,10 +70,10 @@ export default function App() {
             </Route>
             <Route path="courses/:id/:tab?" element={<CourseDetail />} />
             <Route path="guide" element={<Guide isAdmin={isAdmin} />} />
-            <Route path="admin/assignments" element={<AdminOnly><Assignments /></AdminOnly>} />
-            <Route path="admin/term" element={<AdminOnly><TermSetup /></AdminOnly>} />
+            <Route path="admin/assignments" element={<Navigate to="/admin/term/people" replace />} />
+            <Route path="admin/term/:tab?" element={<AdminOnly><TermSetup /></AdminOnly>} />
             <Route path="admin/people" element={<AdminOnly><People /></AdminOnly>} />
-            <Route path="admin/import" element={<AdminOnly><ImportPage /></AdminOnly>} />
+            <Route path="admin/import" element={<Navigate to="/admin/term/import" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

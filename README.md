@@ -1,33 +1,30 @@
 # BME Workflow
 
-Course workflow and outcome-based education (OBE) system for the Department of Biomedical Engineering, BUET.
-It replaces the term Activity Tracker spreadsheet and computes CO/PO attainment from marks stored in the system.
-
-Version 1 covers **Phase 1 (workflow parity)** and **Phase 2 (OBE core)** of the product specification.
+Course workflow and notification system for the Department of Biomedical Engineering, BUET.
+It replaces the term Activity Tracker spreadsheet and keeps everyone informed of whose turn it is.
+**Marks are not kept here**; the site tracks roles, exam steps, class-test dates and course outcomes.
 
 | Area | What it does |
 | --- | --- |
 | My courses | Start page: each course you teach or examine with its progress and your part, plus your calendar of class tests and exams |
 | Department | Open to all faculty: overview, all courses, the shared calendar and program outcomes (workload and setup gaps for HOD/admins) |
 | Theory exam chain | QP A/B → Moderation 1/2 (with "needs correction" rounds per half) → Printing → Script examination A/B → Scrutiny → Gradesheet prep → Gradesheet scrutiny → HOD. Examiner and gradesheet roles are derived, never typed |
-| Sessional courses | A1/A2 tracked separately: assessment plans per sub-section, marks, and the sessional gradesheet chain |
+| Sessional courses | A1/A2 tracked separately: assessment plans per sub-section and the sessional gradesheet chain |
 | Class tests | Dates, statuses, date history with reasons, and a hard block on two class tests for the same cohort on one day (admin override with reason) |
-| Assessment plan | Components (CT, term final, lab report, viva…), counts, marks, weights, best-N; items are generated automatically |
-| Marks | Grid per item with Excel paste, AB/EX flags, validation against question maxima, Entering → Verified → Published → Locked |
+| Assessment plan | Components (CT, term final, lab report, viva…), counts and weights; items are generated automatically |
 | Course outcomes | COs with Bloom domain/level, CO–PO mapping (strength 1–3) against the department's PO1–PO12 |
-| Attainment | CO attained if X% of students score ≥ Y%; best-N per student; correlation-weighted PO contribution; snapshots for the CAR; CSV export |
-| Program view | Curriculum CO–PO coverage matrix and credit-weighted program PO attainment |
-| Department | HOD overview (funnel, course health, workload, setup gaps), assignments, term setup, people & access, workbook import |
+| Program view | Curriculum CO–PO coverage matrix |
+| Term setup | Two ways: import the workbook, or set up by hand (term & dates, courses & sections, teachers & roles, class-test routine) |
 
 ## Architecture
 
 - **Frontend:** React 18 + TypeScript + Vite + Tailwind, static, deployable to GitHub Pages (HashRouter, no server rewrites).
 - **Backend:** Supabase (Postgres 15, Auth, Edge Functions). **Row-level security is the only security boundary.**
-  Workflow rules (dependencies, ownership, correction loop, CT clashes, mark locks, assignment rules) are enforced
+  Workflow rules (dependencies, ownership, correction loop, CT clashes, assignment rules) are enforced
   in the database by constraints, triggers and `security definer` functions; the UI mirrors them only to explain them.
-- **Privacy:** student rows and marks are visible only to the course's teachers, its exam-role holders and admins.
-  Everything else (courses, assignments, statuses, calendar) is readable by all active faculty.
-- **Audit:** inserts/updates/deletes on assignments, exam tasks, items, components, outcomes, marks, access and deadlines are logged with old/new values.
+- **Visibility:** courses, assignments, statuses and the calendar are readable by all active faculty.
+  The marks, roster and attainment tables from earlier versions remain in the schema but the website no longer uses them.
+- **Audit:** inserts/updates/deletes on assignments, exam tasks, items, components, outcomes, access and deadlines are logged with old/new values.
 
 ```
 src/lib/        workflow.ts (exam chain), attainment.ts (OBE maths), importer.ts (workbook), tasks.ts (task feed), api.ts (data)
@@ -63,11 +60,18 @@ Sign in with **First time** to create your password, then **Password**.
 To explore with fictional data instead, run `supabase/seed_demo.sql` on a development project and sign up as
 `hod@example.edu`, `kamal@example.edu` (admin) or `farhan@example.edu` (faculty).
 
-### 3. Load the current term
-**Import workbook** (admins): choose the Activity Tracker `.xlsx`. It is parsed in the browser; the preview lists every
-automatic fix (date formats, code spacing, spelling, name variants) and every item needing review. Nothing is written
-until you press Import; re-importing the same term updates it in place. Then, per course, add students (paste from
-Excel or copy from another course of the same cohort), define COs, and build the assessment plan.
+### 3. Set up the term (two ways, both under **Term setup**)
+1. **Import workbook:** choose the Activity Tracker `.xlsx`. It is parsed in the browser; the preview lists every
+   automatic fix (date formats, code spacing, spelling, name variants) and every item needing review. Nothing is written
+   until you press Import; re-importing the same term updates it in place.
+2. **By hand:** **New term**, then the tabs in order: *Term & dates* → *Courses* (add from the catalog or create a
+   catalog course; cohort and sections) → *Teachers & roles* (section teachers, exam roles, sessional gradesheet roles)
+   → *Class-test routine* (add class tests to theory courses and set every date).
+
+Either way, everything can be adjusted afterwards in the same tabs. Teachers add course outcomes on each course page.
+
+**Existing databases:** run `supabase/migrations/0010_notify_only.sql` once in the SQL Editor. It lets gradesheet
+preparation start without published marks, which this site no longer collects. (`setup.sql` already includes it.)
 
 ### 4. Deploy to GitHub Pages
 1. Repo **Settings → Pages → Source: GitHub Actions**.
@@ -94,18 +98,18 @@ npm test                                   # unit tests
 TRACKER_XLSX=/path/to/tracker.xlsx npm test # also runs the importer against a real workbook (never commit it)
 DB_URL=postgresql://postgres:postgres@localhost:5432/postgres npm run test:db   # migrations + integration checks
 ```
-`supabase/tests/integration.sql` signs in as different users and checks: the sign-up gate; marks hidden from
-unrelated faculty; direct writes to exam tasks refused; dependency and ownership blocks; the full correction loop;
+`supabase/tests/integration.sql` signs in as different users and checks: the sign-up gate; marks-table privacy (legacy);
+direct writes to exam tasks refused; dependency and ownership blocks; the full correction loop;
 CT clash detection; over-maximum and locked marks; item generation per sub-section; roster loading; admin-only import.
 
 ## Open access (no sign-in)
 The database has one switch, `app_settings.open_access`, and `supabase/setup.sql` turns it **on**:
 nobody signs in, every visitor acts as an admin, and the sidebar shows a **Viewing as** picker so
-**My work** still lists that person's tasks. The picker is a convenience, not security.
+**My courses** still shows that person's courses. The picker is a convenience, not security.
 
 While it is on, anyone with the site link (or the database URL and anon key, which every visitor's
-browser receives) can read, change or delete everything, including student marks, and changes are not
-attributed to a person. Use it for setup and testing; switch it off before entering real marks:
+browser receives) can read, change or delete everything, and changes are not
+attributed to a person. Use it for setup and testing; switch it off before real use:
 
 ```sql
 update public.app_settings set open_access = false;   -- require sign-in (add a HOD first: first_admin.sql)
@@ -114,10 +118,9 @@ update public.app_settings set open_access = true;    -- open again
 The switch cannot be changed from the website, only in the Supabase SQL Editor.
 
 ## Rules worth knowing
-- **Attainment thresholds** (X, Y, level cut-offs) are set per term in **Term setup** (defaults 60 / 50; levels 50 / 60 / 70).
-- Only items with **Published** or **Locked** marks count towards attainment.
-- **Locked** marks can only be reopened by an admin; every change is in the audit log.
-- Gradesheet preparation is blocked until all class-test marks (theory) or all items in every sub-section (sessional) are published. Admins can override with a note.
+- An exam step opens only when the steps before it are done; admins can override with a note, which is audited.
+- Two class tests for the same cohort cannot share a day; admins can override with a reason.
+- Removing a course from a term (Term setup → Courses) deletes its sections, roles, workflow progress, plan and dates for that term.
 
 ## Data safety
 `.gitignore` excludes `*.xlsx`, `*.csv` and `.env*`. **Never commit department workbooks, rosters or exports.**

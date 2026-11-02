@@ -1,40 +1,40 @@
-import { ArrowRight, BellRing, BookOpen, ClipboardCheck, FileSpreadsheet, GraduationCap, History, LineChart, Lock, ShieldCheck, Target, UserCog, Users } from 'lucide-react';
+import { ArrowRight, BellRing, BookOpen, CalendarDays, ClipboardCheck, FileSpreadsheet, History, LineChart, Lock, ShieldCheck, UserCog, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { IllCalendar, IllDepartment, IllExamChain, IllImport, IllMarks, IllOutcomes, IllPlan, IllTasks, InkMountains } from '@/components/illustrations';
+import { IllCalendar, IllDepartment, IllExamChain, IllImport, IllOutcomes, IllPlan, IllSetup, IllTasks, InkMountains } from '@/components/illustrations';
 
 /** "How it works": a short illustrated tour of the whole system. Shown in the app and, signed out, from the sign-in page. */
 
 const FLOW: { icon: ReactNode; title: string; text: string; who: string }[] = [
-  { icon: <FileSpreadsheet />, title: 'Load the term', text: 'Import the Activity Tracker workbook. Every fix is previewed before anything is saved.', who: 'Admin' },
-  { icon: <UserCog />, title: 'Assign roles', text: 'Teachers, question setters, moderators and scrutinizers per course. Conflicts are blocked.', who: 'Admin' },
-  { icon: <BookOpen />, title: 'Set up courses', text: 'Add students, write course outcomes and build the assessment plan.', who: 'Faculty' },
-  { icon: <ClipboardCheck />, title: 'Run the term', text: 'Class tests and exam steps open in order. Each course card shows where it stands.', who: 'Everyone' },
-  { icon: <GraduationCap />, title: 'Enter marks', text: 'Paste from Excel, verify, publish and lock. Every change is logged.', who: 'Faculty' },
-  { icon: <Target />, title: 'Measure outcomes', text: 'CO and PO attainment is computed from published marks, ready for the CAR.', who: 'Automatic' },
+  { icon: <FileSpreadsheet />, title: 'Set up the term', text: 'Import the Activity Tracker workbook, or add courses, sections and dates by hand in Term setup.', who: 'Admin' },
+  { icon: <UserCog />, title: 'Assign roles', text: 'Teachers per section, question setters, moderators, scrutinizers and gradesheet roles. Conflicts are blocked.', who: 'Admin' },
+  { icon: <BookOpen />, title: 'Plan each course', text: 'Write the course outcomes and the assessment plan.', who: 'Faculty' },
+  { icon: <CalendarDays />, title: 'Fix the routine', text: 'Set class-test dates. One cohort never gets two class tests on the same day.', who: 'Admin or faculty' },
+  { icon: <ClipboardCheck />, title: 'Run the exam workflow', text: 'Question papers to the HOD, step by step. Each step opens when the one before it is done.', who: 'Everyone' },
+  { icon: <BellRing />, title: 'Get notified', text: 'Your start page and a short email show when it is your turn.', who: 'Automatic' },
 ];
 
 const FEATURES: { art: ReactNode; title: string; text: string; to: string; admin?: boolean }[] = [
   { art: <IllTasks />, title: 'My courses', text: 'Your start page: each course you teach or examine, how it is going, and your calendar of class tests and exams.', to: '/' },
   { art: <IllExamChain />, title: 'Theory exam chain', text: 'Question papers → moderation → printing → scripts → scrutiny → gradesheet → HOD, with correction rounds.', to: '/courses' },
   { art: <IllCalendar />, title: 'Class tests & calendar', text: 'Every class test and exam in one calendar, and a guard against two class tests for one cohort on the same day.', to: '/calendar' },
-  { art: <IllPlan />, title: 'Assessment plans', text: 'Components, weights and best-N per course or sessional sub-section; items are generated for you.', to: '/courses' },
-  { art: <IllMarks />, title: 'Marks', text: 'A grid per item with checks against question maxima: Entering → Verified → Published → Locked.', to: '/courses' },
-  { art: <IllOutcomes />, title: 'Outcomes (OBE)', text: 'CO–PO mapping by strength, attainment against the term thresholds, and program-level coverage.', to: '/outcomes' },
-  { art: <IllDepartment />, title: 'Department overview', text: 'Term-final progress and published marks across every course. The HOD also sees workload and setup gaps.', to: '/dashboard' },
-  { art: <IllImport />, title: 'Workbook import', text: 'Reads the existing spreadsheet in the browser, cleans names and dates, and flags what needs review.', to: '/admin/import', admin: true },
+  { art: <IllPlan />, title: 'Assessment plans', text: 'Components and how many of each, per course or sessional sub-section; items are generated for you.', to: '/courses' },
+  { art: <IllOutcomes />, title: 'Course outcomes', text: 'COs mapped to the program outcomes by strength, and a department-wide coverage matrix.', to: '/outcomes' },
+  { art: <IllDepartment />, title: 'Department overview', text: 'Term-final progress and assessments held across every course. The HOD also sees workload and setup gaps.', to: '/dashboard' },
+  { art: <IllSetup />, title: 'Term setup by hand', text: 'Term dates, courses and sections, teachers and exam roles, and the class-test routine, tab by tab.', to: '/admin/term', admin: true },
+  { art: <IllImport />, title: 'Workbook import', text: 'Or fill the whole term from the existing spreadsheet: read in the browser, every correction shown first.', to: '/admin/term/import', admin: true },
 ];
 
 const ROLES: { icon: ReactNode; title: string; points: string[] }[] = [
-  { icon: <Users />, title: 'Faculty', points: ['See your courses and calendar at a glance', 'Manage rosters, COs and assessment plans', 'Enter and publish marks'] },
-  { icon: <ClipboardCheck />, title: 'Exam roles', points: ['Prepare, moderate or scrutinize papers', 'Return a paper for correction', 'Steps unlock only when the previous one is done'] },
-  { icon: <LineChart />, title: 'HOD & admins', points: ['Set up terms and thresholds', 'Assign roles and manage access', 'See workload across the department'] },
+  { icon: <Users />, title: 'Faculty', points: ['See your courses and calendar at a glance', 'Write course outcomes and assessment plans', 'Set class-test dates for your courses'] },
+  { icon: <ClipboardCheck />, title: 'Exam roles', points: ['Prepare, moderate or scrutinize papers', 'Return a paper for correction', 'Steps open only when the previous one is done'] },
+  { icon: <LineChart />, title: 'HOD & admins', points: ['Set up the term by import or by hand', 'Assign roles and manage access', 'See workload across the department'] },
 ];
 
 const SAFEGUARDS: { icon: ReactNode; title: string; text: string }[] = [
   { icon: <ShieldCheck />, title: 'Rules live in the database', text: 'Order of steps, who owns them and clash checks hold even outside the app.' },
-  { icon: <Lock />, title: 'Marks stay private', text: 'Only a course’s teachers, its exam-role holders and admins can see student marks.' },
-  { icon: <History />, title: 'Everything is audited', text: 'Changes to assignments, tasks, marks and access are logged with before and after values.' },
+  { icon: <Lock />, title: 'Clear ownership', text: 'Each exam step belongs to one person. Only they, or an admin, can move it on.' },
+  { icon: <History />, title: 'Everything is audited', text: 'Changes to assignments, exam steps, dates and access are logged with before and after values.' },
   { icon: <BellRing />, title: 'Email when it is your turn', text: 'A short note when your exam step opens or a paper comes back for correction.' },
 ];
 
@@ -51,8 +51,8 @@ export default function Guide({ signedOut = false, isAdmin = false }: { signedOu
           <div className="text-2xs font-semibold uppercase tracking-wider opacity-80">How it works</div>
           <h1 className="mt-2 text-2xl sm:text-3xl font-semibold tracking-tight">One place for every course, exam step and outcome.</h1>
           <p className="mt-3 text-sm sm:text-base opacity-90">
-            BME Workflow replaces the term’s Activity Tracker spreadsheet. It follows each course from the first week to the
-            Course Assessment Report: who does what, what is due, the marks, and how well students reached the course and program outcomes.
+            BME Workflow replaces the term’s Activity Tracker spreadsheet. It keeps everyone informed: who does what in each course,
+            where every exam paper is, and when class tests and exams happen.
           </p>
           {signedOut && (
             <Link to="/" className="mt-5 inline-flex items-center gap-1.5 h-10 px-4 rounded bg-hero-fg text-hero text-sm font-semibold hover:opacity-90 transition-opacity duration-150">

@@ -102,19 +102,17 @@ export function IllCalendar() {
   );
 }
 
-export function IllMarks() {
-  const steps = ['Entering', 'Verified', 'Published', 'Locked'];
+export function IllSetup() {
   return (
     <Scene>
-      <Paper x={30} y={12} w={180} h={78} />
-      {[0, 1, 2, 3].map((r) => [0, 1, 2, 3, 4].map((c) => (
-        <rect key={`${r}${c}`} x={40 + c * 33} y={22 + r * 16} width={c === 0 ? 30 : 26} height="10" rx="2"
-          className={r === 0 ? 'fill-sunken' : c === 0 ? 'fill-line' : r === 2 && c === 3 ? 'fill-warn-soft stroke-warn' : 'fill-brand-soft'} strokeWidth="1" />
-      )))}
-      {steps.map((t, i) => (
-        <g key={t} transform={`translate(${24 + i * 50} 104)`}>
-          <rect width="44" height="18" rx="9" className={i < 3 ? 'fill-brand' : 'fill-surface stroke-line-strong'} strokeWidth="1" />
-          <text x="22" y="12.5" textAnchor="middle" fontSize="7.5" fontWeight="600" className={i < 3 ? 'fill-brand-fg' : 'fill-subtle'}>{t}</text>
+      <Paper x={34} y={14} w={172} h={112} />
+      {[0, 1, 2, 3].map((t) => <rect key={t} x={44 + t * 38} y="22" width="32" height="8" rx="4" className={t === 1 ? 'fill-brand' : 'fill-sunken'} />)}
+      {[0, 1, 2, 3].map((r) => (
+        <g key={r} transform={`translate(0 ${r * 20})`}>
+          <circle cx="54" cy="50" r="6" className={r < 3 ? 'fill-wash' : 'fill-none stroke-line-strong'} strokeWidth="1.5" />
+          {r < 3 && <path d="M51 50 l2 2 l4 -4" className="stroke-surface" strokeWidth="1.6" fill="none" strokeLinecap="round" />}
+          <rect x="68" y="47" width={[70, 52, 84, 60][r]} height="5" rx="2.5" className="fill-ink/60" />
+          <rect x="170" y="45" width="24" height="10" rx="5" className={r < 3 ? 'fill-brand/80' : 'fill-sunken'} />
         </g>
       ))}
     </Scene>

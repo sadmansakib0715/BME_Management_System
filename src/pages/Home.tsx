@@ -104,7 +104,6 @@ function CourseCard({ data, me, o, c, a, teaches, examRoles, gsRole }: {
   const p = a ? examProgress(tasks) : null;
   const items = data.items.filter((i) => i.offering_id === o.id && i.status !== 'cancelled');
   const held = items.filter((i) => i.status === 'held').length;
-  const published = items.filter((i) => ['published', 'locked'].includes(i.marks_status)).length;
   const today = todayISO();
   const next = items.filter((i) => i.held_on && i.held_on >= today && i.status !== 'held').sort((x, y) => x.held_on!.localeCompare(y.held_on!))[0];
   const roles = [teaches && 'Teacher', ...examRoles.map((k) => ROLE[k]), gsRole].filter(Boolean) as string[];
@@ -134,8 +133,8 @@ function CourseCard({ data, me, o, c, a, teaches, examRoles, gsRole }: {
         )}
         {teaches && items.length > 0 && (
           <div>
-            <div className="flex justify-between text-2xs text-muted mb-1"><span>Assessments · {held} held, {published} published</span><span className="tabular">{published}/{items.length}</span></div>
-            <Meter value={published} max={items.length} label={`${c.code} assessments with published marks`} />
+            <div className="flex justify-between text-2xs text-muted mb-1"><span>Class tests & assessments held</span><span className="tabular">{held}/{items.length}</span></div>
+            <Meter value={held} max={items.length} label={`${c.code} assessments held`} />
           </div>
         )}
         {teaches && !items.length && <p className="text-2xs text-subtle">No assessment plan yet</p>}

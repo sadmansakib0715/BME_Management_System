@@ -1,6 +1,5 @@
 import { CalendarDays, History, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
 import { Badge, Button, Callout, Card, CardHeader, Dialog, Empty, Field, Input, Select, SegTabs, Textarea, useToast } from '@/components/ui';
 import { must, rpc, useItemHistory, useWrite } from '@/lib/api';
@@ -8,7 +7,7 @@ import { fmtDate, fmtDateLong } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { useTerm } from '@/lib/TermContext';
 import type { AssessmentComponent, AssessmentItem, ComponentKind } from '@/lib/types';
-import { COMPONENT_KINDS, ITEM_STATUS, labelOf, MARKS_STATUS } from '@/lib/workflow';
+import { COMPONENT_KINDS, ITEM_STATUS, labelOf } from '@/lib/workflow';
 import type { TabProps } from './shared';
 
 type Draft = Omit<AssessmentComponent, 'id' | 'offering_id' | 'sort'> & { id?: string };
@@ -66,8 +65,6 @@ export default function AssessmentsTab({ offering, course, data }: TabProps) {
                 {canEdit && <td><div className="flex gap-1 justify-end">
                   <Button size="sm" variant="ghost" aria-label={`Edit ${c.name}`} onClick={() => setEdit({ ...c })}><Pencil className="size-4" aria-hidden /></Button>
                   <Button size="sm" variant="ghost" aria-label={`Delete ${c.name}`} onClick={() => {
-                    const used = data.items.some((i) => i.component_id === c.id && i.marks_status !== 'none');
-                    if (used) return toast('bad', 'This component has marks. Clear its marks before deleting it.');
                     if (confirm(`Delete "${c.name}" and its items?`)) delComp.mutate(c.id, { onSuccess: () => toast('ok', 'Component deleted'), onError: (e) => toast('bad', e.message) });
                   }}><Trash2 className="size-4" aria-hidden /></Button></div></td>}
               </tr>))}</tbody>
@@ -82,7 +79,7 @@ export default function AssessmentsTab({ offering, course, data }: TabProps) {
           subtitle="Dates feed the department calendar. Class tests for the same cohort cannot share a day."
           actions={sections.length > 1 && <SegTabs label="Sub-section" value={section} onChange={setSection} options={[{ value: 'all', label: 'All' }, ...sections.map((s) => ({ value: s.id, label: s.name }))]} />} />
         <div className="overflow-x-auto"><table className="table">
-          <thead><tr><th>Item</th>{sections.length > 1 && <th>Section</th>}<th>Date</th><th>Status</th><th>Marks</th><th>Responsible</th></tr></thead>
+          <thead><tr><th>Item</th>{sections.length > 1 && <th>Section</th>}<th>Date</th><th>Status</th><th>Responsible</th></tr></thead>
           <tbody>{items.sort((a, b) => (a.held_on ?? '9').localeCompare(b.held_on ?? '9') || a.seq - b.seq).map((i) => (
             <tr key={i.id}>
               <td><div className="font-medium">{i.title}</div><div className="text-2xs text-subtle tabular">{Number(i.total_marks)} marks</div></td>
@@ -99,7 +96,6 @@ export default function AssessmentsTab({ offering, course, data }: TabProps) {
                   {ITEM_STATUS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </Select>
               </td>
-              <td><Link className="link text-sm" to={`/courses/${offering.id}/marks?item=${i.id}`}>{labelOf(MARKS_STATUS, i.marks_status)}</Link></td>
               <td>
                 <label className="sr-only" htmlFor={`ir-${i.id}`}>Responsible teacher for {i.title}</label>
                 <Select id={`ir-${i.id}`} className="h-8 w-56" disabled={!canEdit} value={i.responsible ?? ''}
@@ -135,13 +131,13 @@ function ComponentDialog({ draft, onClose, onSave, busy, hasSections }: { draft:
         {hasSections && <Field label="Scope" htmlFor="c-s"><Select id="c-s" value={d.per_section ? '1' : '0'} onChange={(e) => set('per_section', e.target.value === '1')}>
           <option value="1">Separate items per sub-section</option><option value="0">One item for the whole course</option></Select></Field>}
         {err && <p role="alert" className="col-span-2 text-2xs text-bad">{err}</p>}
-        <p className="col-span-2 text-2xs text-subtle">Items are created or removed to match the count. Items that already have marks are never removed.</p>
+        <p className="col-span-2 text-2xs text-subtle">Items are created or removed to match the count.</p>
       </div>}
     </Dialog>
   );
 }
 
-function RescheduleDialog({ item, onClose, admin }: { item: AssessmentItem | null; onClose: () => void; admin: boolean }) {
+export function RescheduleDialog({ item, onClose, admin }: { item: AssessmentItem | null; onClose: () => void; admin: boolean }) {
   const toast = useToast();
   const { nameOf } = useTerm();
   const [date, setDate] = useState('');

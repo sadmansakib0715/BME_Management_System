@@ -9,10 +9,7 @@ import Overview from './Overview';
 
 const ExamTab = lazy(() => import('./ExamTab'));
 const AssessmentsTab = lazy(() => import('./AssessmentsTab'));
-const MarksTab = lazy(() => import('./MarksTab'));
 const OutcomesTab = lazy(() => import('./OutcomesTab'));
-const AttainmentTab = lazy(() => import('./AttainmentTab'));
-const RosterTab = lazy(() => import('./RosterTab'));
 
 export default function CourseDetail() {
   const { id = '', tab = 'overview' } = useParams();
@@ -26,7 +23,7 @@ export default function CourseDetail() {
   const isTheory = c.course_type === 'theory';
   const tabs = [
     ['overview', 'Overview'], ['exam', isTheory ? 'Exam workflow' : 'Gradesheet'], ['assessments', isTheory ? 'Class tests & plan' : 'Assessments'],
-    ['marks', 'Marks'], ['outcomes', 'Course outcomes'], ['attainment', 'Attainment'], ['roster', 'Students'],
+    ['outcomes', 'Course outcomes'],
   ] as const;
   const props = { offering: o, course: c, data };
 
@@ -52,10 +49,7 @@ export default function CourseDetail() {
         {tab === 'overview' && <Overview {...props} />}
         {tab === 'exam' && <ExamTab {...props} />}
         {tab === 'assessments' && <AssessmentsTab {...props} />}
-        {tab === 'marks' && <MarksTab {...props} />}
         {tab === 'outcomes' && <OutcomesTab {...props} />}
-        {tab === 'attainment' && <AttainmentTab {...props} />}
-        {tab === 'roster' && <RosterTab {...props} />}
       </Suspense>
     </>
   );

@@ -43,7 +43,7 @@ export default function Login() {
         <div className="relative text-sm font-semibold tracking-wide opacity-90">Department of Biomedical Engineering · BUET</div>
         <div className="relative">
           <h1 className="text-3xl font-semibold tracking-tight max-w-md">Every course, exam step and outcome in one place.</h1>
-          <p className="mt-3 max-w-md opacity-85">Question papers, class tests, sessional assessments, marks and CO/PO attainment, tracked from the first week to the CAR.</p>
+          <p className="mt-3 max-w-md opacity-85">Question papers, class tests, sessional assessments and course outcomes. Everyone knows whose turn it is, from the first week to the HOD.</p>
         </div>
         <div className="relative flex items-center justify-between gap-4 text-2xs">
           <span className="opacity-80">Access is limited to department faculty.</span>

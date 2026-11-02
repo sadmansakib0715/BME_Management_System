@@ -2,12 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Card, CardHeader, ErrorNote, PageHeader, Spinner } from '@/components/ui';
 import { usePOs } from '@/lib/api';
-import { programPo, type PoResult } from '@/lib/attainment';
 import { supabase } from '@/lib/supabase';
 import { useTerm } from '@/lib/TermContext';
 import type { CoPo, CourseOutcome } from '@/lib/types';
 
-/** Program-level OBE view: POs, curriculum CO–PO coverage for this term, and PO attainment from saved course snapshots. */
+/** Program-level OBE view: POs and curriculum CO–PO coverage for this term. */
 export default function Outcomes() {
   const { data, loading, error, courseOf } = useTerm();
   const pos = usePOs();
@@ -19,9 +18,7 @@ export default function Outcomes() {
       if (e1) throw e1;
       const { data: map, error: e2 } = await supabase.from('co_po_map').select('*').in('co_id', (cos ?? []).map((c) => c.id));
       if (e2) throw e2;
-      // Latest snapshot per course; RLS returns only courses the viewer may see in detail.
-      const { data: snaps } = await supabase.from('attainment_snapshots').select('offering_id, payload, computed_at').in('offering_id', ids).order('computed_at', { ascending: false });
-      return { cos: (cos ?? []) as Pick<CourseOutcome, 'id' | 'offering_id' | 'code'>[], map: (map ?? []) as CoPo[], snaps: (snaps ?? []) as { offering_id: string; payload: { pos: PoResult[] } }[] };
+      return { cos: (cos ?? []) as Pick<CourseOutcome, 'id' | 'offering_id' | 'code'>[], map: (map ?? []) as CoPo[] };
     },
   });
   if (loading || pos.isLoading || cov.isLoading) return <Spinner />;
@@ -32,25 +29,11 @@ export default function Outcomes() {
   const strongest = (offeringId: string, po: string) => Math.max(0, ...cov.data.map.filter((m) => m.po_code === po && cov.data.cos.some((c) => c.id === m.co_id && c.offering_id === offeringId)).map((m) => m.strength));
   const rows = data.offerings.map((o) => ({ o, c: courseOf(o)! })).filter((r) => r.c).sort((a, b) => a.c.code.localeCompare(b.c.code));
   const covered = (po: string) => rows.filter((r) => strongest(r.o.id, po) > 0).length;
-  const latest = new Map<string, { pos: PoResult[] }>();
-  for (const s of cov.data.snaps) if (!latest.has(s.offering_id)) latest.set(s.offering_id, s.payload);
-  const program = programPo([...latest.entries()].map(([oid, p]) => ({ credits: Number(courseOf(oid)?.credits ?? 3), pos: p.pos })));
   const shade = ['', 'bg-brand/15 text-brand-ink', 'bg-brand/35 text-brand-ink', 'bg-brand text-brand-fg'];
 
   return (
     <>
-      <PageHeader eyebrow={data.term.name} title="Program outcomes" description="How this term's courses cover PO1–PO12, and the program's attainment from the course snapshots saved so far." />
-      <Card className="mb-5">
-        <CardHeader title="PO attainment this term" subtitle={`Credit-weighted from ${latest.size} saved course snapshot${latest.size === 1 ? '' : 's'}. Scale 0–3; target level 2.`} />
-        <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-12 gap-2 p-4">
-          {poList.map((p) => { const r = program.find((x) => x.po === p.code);
-            return <div key={p.code} className="rounded border border-line p-2 text-center" title={`${p.title}: ${p.statement}`}>
-              <div className="text-2xs font-semibold text-subtle">{p.code}</div>
-              <div className={`text-lg font-semibold tabular ${r ? (r.level >= 2 ? 'text-ok' : 'text-warn') : 'text-subtle'}`}>{r ? r.level.toFixed(2) : '—'}</div>
-              <div className="text-2xs text-subtle">{r ? `${r.courses} course${r.courses === 1 ? '' : 's'}` : 'no data'}</div>
-            </div>; })}
-        </div>
-      </Card>
+      <PageHeader eyebrow={data.term.name} title="Program outcomes" description="How this term's courses cover PO1–PO12 through their course outcomes." />
       <Card>
         <CardHeader title="CO–PO coverage matrix" subtitle="Strongest correlation of any CO in each course. Empty rows mean outcomes are not defined yet." />
         <div className="overflow-x-auto"><table className="table">
