@@ -10,6 +10,7 @@ import Overview from './Overview';
 const ExamTab = lazy(() => import('./ExamTab'));
 const AssessmentsTab = lazy(() => import('./AssessmentsTab'));
 const OutcomesTab = lazy(() => import('./OutcomesTab'));
+const ProgressTab = lazy(() => import('./ProgressTab'));
 
 export default function CourseDetail() {
   const { id = '', tab = 'overview' } = useParams();
@@ -23,7 +24,7 @@ export default function CourseDetail() {
   const isTheory = c.course_type === 'theory';
   const tabs = [
     ['overview', 'Overview'], ['exam', isTheory ? 'Exam workflow' : 'Gradesheet'], ['assessments', isTheory ? 'Class tests & plan' : 'Assessments'],
-    ['outcomes', 'OBE'],
+    ['outcomes', 'OBE'], ['progress', 'Progress tree'],
   ] as const;
   const props = { offering: o, course: c, data };
 
@@ -50,6 +51,7 @@ export default function CourseDetail() {
         {tab === 'exam' && <ExamTab {...props} />}
         {tab === 'assessments' && <AssessmentsTab {...props} />}
         {tab === 'outcomes' && <OutcomesTab {...props} />}
+        {tab === 'progress' && <ProgressTab {...props} />}
       </Suspense>
     </>
   );

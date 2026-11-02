@@ -1,10 +1,11 @@
 import { clsx } from 'clsx';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
 import { TypeBadge } from '@/components/bits';
-import { Button, Card, CardHeader, Empty, ErrorNote, Meter, PageHeader, Spinner } from '@/components/ui';
+import TermTree from '@/components/TermTree';
+import { Button, Card, CardHeader, Empty, ErrorNote, Meter, PageHeader, SegTabs, Spinner } from '@/components/ui';
 import type { TermData } from '@/lib/api';
 import { fmtDate, todayISO } from '@/lib/format';
 import { useTerm } from '@/lib/TermContext';
@@ -26,6 +27,8 @@ export default function Home() {
   const { me } = useAuth();
   const { data, loading, error, courseOf, nameOf, teachersOf } = useTerm();
   const fid = me?.facultyId ?? null;
+  const [params, setParams] = useSearchParams();
+  const view = params.get('view') === 'tree' ? 'tree' : 'cards';
 
   const mine = useMemo(() => {
     if (!data || !fid) return [];
@@ -75,19 +78,25 @@ export default function Home() {
     <>
       <PageHeader eyebrow={`${t.name} · ${week}`} title={`Hello, ${first}`}
         actions={<Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-ink hover:underline underline-offset-2">Department overview<ArrowRight className="size-4" aria-hidden /></Link>} />
-      <div className="grid gap-6 xl:grid-cols-[1fr_380px] [&>*]:min-w-0">
+      <div className={clsx('grid gap-6 [&>*]:min-w-0', view === 'cards' && 'xl:grid-cols-[1fr_380px]')}>
         <section aria-labelledby="my-courses">
-          <h2 id="my-courses" className="text-base font-semibold mb-3">My courses</h2>
-          {mine.length ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h2 id="my-courses" className="text-base font-semibold">My courses</h2>
+            {mine.length > 0 && <SegTabs label="Show my courses as" value={view} onChange={(v) => setParams(v === 'tree' ? { view: 'tree' } : {})}
+              options={[{ value: 'cards', label: 'Cards' }, { value: 'tree', label: 'Tree view' }]} />}
+          </div>
+          {mine.length && view === 'tree' ? (
+            <TermTree data={data} offerings={mine.map((m) => m.o)} label="My courses" hint={nameOf(fid)} />
+          ) : mine.length ? (
             <ul className="grid gap-3 md:grid-cols-2">
               {mine.map((m) => <li key={m.o.id}><CourseCard data={data} me={fid} {...m} /></li>)}
             </ul>
           ) : <Card><Empty title="No courses this term">Courses you teach or examine will appear here.</Empty></Card>}
         </section>
-        <section aria-labelledby="my-cal">
+        {view === 'cards' && <section aria-labelledby="my-cal">
           <h2 id="my-cal" className="text-base font-semibold mb-3">My calendar</h2>
           <MyCalendar events={events} />
-        </section>
+        </section>}
       </div>
     </>
   );

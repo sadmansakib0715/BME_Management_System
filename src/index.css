@@ -72,6 +72,31 @@
   .prog-2 { background-color: rgb(var(--p2-soft)); color: rgb(var(--p2)); border-color: rgb(var(--p2) / 0.35); }
   .prog-3 { background-color: rgb(var(--p3-soft)); color: rgb(var(--p3)); border-color: rgb(var(--p3) / 0.35); }
   .prog-n { background-color: rgb(var(--sunken)); color: rgb(var(--muted)); border-color: rgb(var(--line-strong)); }
+  /* Progress tree (src/components/ProgressTree.tsx): horizontal, root on the left, elbow connectors. */
+  .ptree, .ptree li { display: flex; align-items: center; }
+  .ptree ul { display: flex; flex-direction: column; position: relative; padding-left: 1.25rem; }
+  .ptree ul::before { content: ''; position: absolute; left: 0; top: 50%; width: 1.25rem; border-top: 1px solid rgb(var(--line-strong)); }
+  .ptree li { position: relative; padding: .2rem 0 .2rem 1rem; }
+  .ptree li::before { content: ''; position: absolute; left: 0; top: 50%; width: 1rem; border-top: 1px solid rgb(var(--line-strong)); }
+  .ptree li::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; border-left: 1px solid rgb(var(--line-strong)); }
+  .ptree li:only-child::after { display: none; }
+  .ptree li:first-child:not(:only-child)::before, .ptree li:last-child:not(:only-child)::before { display: none; }
+  .ptree li:first-child:not(:only-child)::after { top: 50%; width: 1rem; border-top: 1px solid rgb(var(--line-strong)); border-top-left-radius: 8px; }
+  .ptree li:last-child:not(:only-child)::after { bottom: 50%; width: 1rem; border-bottom: 1px solid rgb(var(--line-strong)); border-bottom-left-radius: 8px; }
+  .ptree-node { @apply relative z-[1] inline-flex items-center gap-2 max-w-[15rem] rounded border border-line bg-surface px-2.5 py-1.5 text-sm font-medium
+                text-ink whitespace-nowrap transition-colors duration-150 hover:border-line-strong cursor-pointer; }
+  .ptree-root { @apply cursor-default border-line-strong bg-sunken px-3 py-2; }
+  .ptree-node-locked, .ptree-node-na { @apply text-subtle font-normal; }
+  .ptree-node-returned { border-color: rgb(var(--warn) / .45); }
+  .ptree-node-open { border-color: rgb(var(--ink) / .5); background: rgb(var(--sunken)); }
+  .ptree-next { box-shadow: 0 0 0 2px rgb(var(--brand) / .55); animation: ptree-call 1.6s ease-out 2; }
+  .ptree-dot { @apply inline-block size-2.5 shrink-0 rounded-full; }
+  .ptree-dot-done { background: rgb(var(--ok)); }
+  .ptree-dot-active { background: conic-gradient(rgb(var(--info)) 0 50%, transparent 0); box-shadow: inset 0 0 0 1.5px rgb(var(--info)); }
+  .ptree-dot-returned { background: rgb(var(--warn)); border-radius: 2px; transform: rotate(45deg) scale(.85); }
+  .ptree-dot-ready { box-shadow: inset 0 0 0 1.5px rgb(var(--brand)); }
+  .ptree-dot-locked { box-shadow: inset 0 0 0 1.5px rgb(var(--line-strong)); background: rgb(var(--sunken)); }
+  .ptree-dot-na { background: rgb(var(--line)); }
   .kbd { @apply font-mono text-2xs px-1.5 py-0.5 rounded border border-line bg-sunken text-muted; }
   /* Click feedback (src/lib/tap.ts): squish, spring back, and a slate ripple. Wide targets get a gentler squish. */
   .tap    { animation: tap-press 340ms cubic-bezier(.34,1.56,.64,1), tap-ripple 480ms ease-out; }
@@ -85,6 +110,7 @@
   .car-print { position: absolute; left: 0; top: 0; width: 100%; border: 0; box-shadow: none; }
 }
 
+@keyframes ptree-call { 0% { box-shadow: 0 0 0 2px rgb(var(--brand) / .55), 0 0 0 2px rgb(var(--brand) / .35); } 100% { box-shadow: 0 0 0 2px rgb(var(--brand) / .55), 0 0 0 10px rgb(var(--brand) / 0); } }
 @keyframes tap-press    { 0% { transform: scale(1); } 30% { transform: scale(.92); } 70% { transform: scale(1.03); } 100% { transform: scale(1); } }
 @keyframes tap-press-lg { 0% { transform: scale(1); } 30% { transform: scale(.985); } 70% { transform: scale(1.004); } 100% { transform: scale(1); } }
 @keyframes tap-ripple   { 0% { box-shadow: 0 0 0 0 rgb(var(--wash) / .45); } 100% { box-shadow: 0 0 0 9px rgb(var(--wash) / 0); }

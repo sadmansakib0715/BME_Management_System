@@ -11,6 +11,7 @@ const Home = lazy(() => import('./pages/Home'));
 const Courses = lazy(() => import('./pages/Courses'));
 const CourseDetail = lazy(() => import('./pages/course/CourseDetail'));
 const Calendar = lazy(() => import('./pages/Calendar'));
+const DeptTree = lazy(() => import('./pages/DeptTree'));
 const Outcomes = lazy(() => import('./pages/Outcomes'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const TermSetup = lazy(() => import('./pages/admin/TermSetup'));
@@ -66,6 +67,7 @@ export default function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="courses" element={<Courses />} />
               <Route path="calendar" element={<Calendar />} />
+              <Route path="tree" element={<DeptTree />} />
             </Route>
             <Route path="outcomes" element={<Outcomes />} />
             <Route path="courses/:id/:tab?" element={<CourseDetail />} />

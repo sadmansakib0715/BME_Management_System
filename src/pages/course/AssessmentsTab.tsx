@@ -6,11 +6,26 @@ import { must, rpc, useItemHistory, useWrite } from '@/lib/api';
 import { fmtDate, fmtDateLong } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { useTerm } from '@/lib/TermContext';
-import type { AssessmentComponent, AssessmentItem, ComponentKind } from '@/lib/types';
+import type { AssessmentComponent, AssessmentItem, ComponentKind, Course } from '@/lib/types';
 import { COMPONENT_KINDS, ITEM_STATUS, labelOf, MARKS_LEGACY, MARKS_STATE } from '@/lib/workflow';
 import type { TabProps } from './shared';
 
-type Draft = Omit<AssessmentComponent, 'id' | 'offering_id' | 'sort'> & { id?: string };
+export type Draft = Omit<AssessmentComponent, 'id' | 'offering_id' | 'sort'> & { id?: string };
+
+/** A blank component, as the Add component button starts it. */
+export const newComponentDraft = (course: Course): Draft =>
+  ({ kind: 'other', name: '', item_count: 1, marks_each: 10, weight: 0, best_n: null, per_section: course.course_type !== 'theory' });
+
+/** Saves a component and regenerates its items. Shared by this tab and the progress tree. */
+export function useSaveComponent(offeringId: string, componentCount: number) {
+  return useWrite(async (d: Draft) => {
+    const row = { offering_id: offeringId, kind: d.kind, name: d.name.trim(), item_count: d.item_count, marks_each: d.marks_each, weight: d.weight,
+      best_n: d.best_n || null, per_section: d.per_section, sort: d.id ? undefined : componentCount + 1 };
+    const saved = d.id ? await must(supabase.from('assessment_components').update(row).eq('id', d.id).select().single())
+      : await must(supabase.from('assessment_components').insert(row).select().single());
+    await rpc.generateItems((saved as AssessmentComponent).id);
+  });
+}
 
 const THEORY_DEFAULTS: Draft[] = [
   { kind: 'attendance', name: 'Attendance', item_count: 1, marks_each: 30, weight: 10, best_n: null, per_section: false },
@@ -30,13 +45,7 @@ export default function AssessmentsTab({ offering, course, data }: TabProps) {
   const [moving, setMoving] = useState<AssessmentItem | null>(null);
   const weight = comps.reduce((s, c) => s + Number(c.weight), 0);
 
-  const saveComp = useWrite(async (d: Draft) => {
-    const row = { offering_id: offering.id, kind: d.kind, name: d.name.trim(), item_count: d.item_count, marks_each: d.marks_each, weight: d.weight,
-      best_n: d.best_n || null, per_section: d.per_section, sort: d.id ? undefined : comps.length + 1 };
-    const saved = d.id ? await must(supabase.from('assessment_components').update(row).eq('id', d.id).select().single())
-      : await must(supabase.from('assessment_components').insert(row).select().single());
-    await rpc.generateItems((saved as AssessmentComponent).id);
-  });
+  const saveComp = useSaveComponent(offering.id, comps.length);
   const delComp = useWrite((id: string) => must(supabase.from('assessment_components').delete().eq('id', id)));
   const updItem = useWrite((a: { id: string; patch: Partial<AssessmentItem> }) => must(supabase.from('assessment_items').update(a.patch).eq('id', a.id)));
   const seed = useWrite(async () => { for (const d of THEORY_DEFAULTS) await saveComp.mutateAsync(d); });
@@ -48,7 +57,7 @@ export default function AssessmentsTab({ offering, course, data }: TabProps) {
     <div className="space-y-5 min-w-0">
       <Card>
         <CardHeader title="Assessment plan" subtitle="Components, how many of each, and their weight in the final grade."
-          actions={canEdit && <Button size="sm" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEdit({ kind: 'other', name: '', item_count: 1, marks_each: 10, weight: 0, best_n: null, per_section: course.course_type !== 'theory' })}>Add component</Button>} />
+          actions={canEdit && <Button size="sm" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEdit(newComponentDraft(course))}>Add component</Button>} />
         {comps.length === 0 ? (
           <Empty title="No assessment plan yet" action={canEdit && course.course_type === 'theory' ? <Button variant="primary" loading={seed.isPending} onClick={() => seed.mutate(undefined, { onError: (e) => toast('bad', e.message), onSuccess: () => toast('ok', 'Standard theory plan created') })}>Use standard theory plan</Button> : undefined}>
             {course.course_type === 'theory' ? 'Start from the standard plan (attendance 10, class tests 20 with best 3 of 4, term final 70) and adjust it.' : 'Add components such as lab reports, lab tests, quiz and viva. Choose “per sub-section” to track A1 and A2 separately.'}
@@ -118,7 +127,7 @@ export default function AssessmentsTab({ offering, course, data }: TabProps) {
   );
 }
 
-function ComponentDialog({ draft, onClose, onSave, busy, hasSections }: { draft: Draft | null; onClose: () => void; onSave: (d: Draft) => void; busy: boolean; hasSections: boolean }) {
+export function ComponentDialog({ draft, onClose, onSave, busy, hasSections }: { draft: Draft | null; onClose: () => void; onSave: (d: Draft) => void; busy: boolean; hasSections: boolean }) {
   const [d, setD] = useState<Draft | null>(draft);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((x) => (x ? { ...x, [k]: v } : x));
   const err = d && (!d.name.trim() ? 'Give the component a name.' : d.best_n && d.best_n > d.item_count ? 'Counted items cannot exceed the number of items.' : null);
