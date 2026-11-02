@@ -2,7 +2,7 @@
 -- After this, add everyone else from the app (People & access).
 with me as (
   insert into public.faculty (full_name, display_name, designation, email)
-  values ('FULL NAME', 'Dr. DISPLAY NAME', 'Professor', lower('you@bme.buet.ac.bd'))
+  values ('Sadman Sakib Himel', 'SadmanSakib715 ', 'Lecturer', lower('sadman@bme.buet.ac.bd'))
   returning id, email
 )
 insert into public.allowed_users (email, faculty_id, app_role)
