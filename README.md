@@ -14,7 +14,8 @@ under evaluation or published (a status only), and course outcomes (OBE).
 | Class tests | Dates, colour-coded statuses (planned → held) and marks status (not evaluated → under evaluation → published), date history with reasons, and a hard block on two class tests for the same cohort on one day (admin override with reason) |
 | Assessment plan | Components (CT, term final, lab report, viva…), counts and weights; items are generated automatically |
 | Course outcomes | COs with Bloom domain/level, CO–PO mapping (strength 1–3) against the department's PO1–PO12 |
-| OBE | Per-course CO readiness, curriculum CO–PO coverage matrix, POs and PEOs |
+| OBE (course) | Per offering: COs with taxonomy levels, delivery and tools; CO–PO and K/P/A mapping (binary, as CO-PO Mapping.docx); imported cohort CO% / PO% with Y/N at ≥ 40% and NA for unmapped POs; course-file checklist; CAR (parts A–B from data, C–E written, Draft → Submitted → Reviewed → Final) |
+| OBE (program) | Course dashboard, program PO per batch from BME 300/350/400, CO–PO coverage, BUGS resolutions, CQI log (CO / PO / PEO loops), PEOs, POs, K/P/A |
 | Term setup | Two ways: import the workbook, or set up by hand (term & dates, courses & sections, teachers & roles, class-test routine) |
 
 ## Architecture
@@ -71,8 +72,10 @@ To explore with fictional data instead, run `supabase/seed_demo.sql` on a develo
 
 Either way, everything can be adjusted afterwards in the same tabs. Teachers add course outcomes on each course page.
 
-**Existing databases:** run `supabase/migrations/0010_notify_only.sql` once in the SQL Editor. It lets gradesheet
-preparation start without published marks, which this site no longer collects. (`setup.sql` already includes it.)
+**Existing databases:** run `supabase/migrations/0010_notify_only.sql` and then `0011_obe_results.sql` once each in the SQL Editor.
+0010 lets gradesheet preparation start without published marks, which this site no longer collects. 0011 adds the OBE
+tables (imported attainment, CAR, course file, BUGS resolutions, CQI log) and flags BME 300/350/400 as culminating.
+(`setup.sql` already includes both.)
 
 ### 4. Deploy to GitHub Pages
 1. Repo **Settings → Pages → Source: GitHub Actions**.
@@ -128,5 +131,5 @@ The switch cannot be changed from the website, only in the Supabase SQL Editor.
 If a workbook was committed before, remove it from history (`git filter-repo --path '<file>' --invert-paths`) and force-push.
 
 ## Not in this version (next phases)
-Course File/CAR document generation and CQI tracking, thesis and design-project modules, notices, meetings and minutes,
+DOCX export of the CAR and course file (print/PDF works now), PEO surveys, rubric and peer-review tools for BME 300/350/400, notices, meetings and minutes,
 leave, lab inventory, purchase requisitions, class routine, and grade computation/export.

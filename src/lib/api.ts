@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { humanError, supabase } from './supabase';
 import type {
-  AssessmentComponent, AssessmentItem, CoPo, Course, CourseOutcome, CourseRecord, ExamAssignment,
+  AssessmentComponent, AssessmentItem, BugsResolution, CarReport, CoPo, Course, CourseFileItem, CourseOutcome, CourseRecord, CqiItem, ExamAssignment, ObeAttainment, ProgramPo,
   ExamTask, Faculty, ItemDateHistory, Milestone, ModerationRound, Offering, PEO, PO, Section, SectionTeacher,
   SessionalGradesheet, Term, AllowedUser,
 } from './types';
@@ -58,18 +58,64 @@ export function useTermData(termId: string | undefined) {
   });
 }
 
-// ---------------------------------------------------------------- course outcomes
-export interface CourseObe { cos: CourseOutcome[]; coPo: CoPo[] }
+// ---------------------------------------------------------------- OBE per offering (COs, mapping, imported attainment, CAR, course file)
+export interface PrevOffering { id: string; termName: string; cos: CourseOutcome[]; coPo: CoPo[]; attainment: ObeAttainment[]; car: CarReport | null }
+export interface CourseObe { cos: CourseOutcome[]; coPo: CoPo[]; attainment: ObeAttainment[]; car: CarReport | null; files: CourseFileItem[]; prev: PrevOffering | null }
 
-export function useCourseObe(offeringId: string | undefined) {
+/** The same course's most recent earlier offering: CAR Part B compares with it and Part D carries its Part E forward. */
+async function previousOffering(offering: Offering, term: Term): Promise<PrevOffering | null> {
+  const list = await rows<{ id: string; terms: { code: string; name: string; starts_on: string | null } | null }>(
+    supabase.from('offerings').select('id, terms(code, name, starts_on)').eq('course_id', offering.course_id).neq('id', offering.id) as never);
+  const key = (t: { code: string; starts_on: string | null }) => t.starts_on ?? t.code;
+  const earlier = list.filter((x) => x.terms && key(x.terms) < key(term)).sort((a, b) => key(b.terms!).localeCompare(key(a.terms!)))[0];
+  if (!earlier) return null;
+  const cos = await rows<CourseOutcome>(supabase.from('course_outcomes').select('*').eq('offering_id', earlier.id).order('sort'));
+  const [coPo, attainment, car] = await Promise.all([
+    rowsIn<CoPo>('co_po_map', 'co_id', cos.map((c) => c.id)),
+    rows<ObeAttainment>(supabase.from('obe_attainment').select('*').eq('offering_id', earlier.id)),
+    rows<CarReport>(supabase.from('car_reports').select('*').eq('offering_id', earlier.id)),
+  ]);
+  return { id: earlier.id, termName: earlier.terms!.name, cos, coPo, attainment, car: car[0] ?? null };
+}
+
+export function useCourseObe(offering: Offering | undefined, term: Term | undefined) {
   return useQuery({
-    queryKey: ['obe', offeringId], enabled: !!offeringId,
+    queryKey: ['obe', offering?.id], enabled: !!offering && !!term,
     queryFn: async (): Promise<CourseObe> => {
-      const cos = await rows<CourseOutcome>(supabase.from('course_outcomes').select('*').eq('offering_id', offeringId!).order('sort'));
-      return { cos, coPo: await rowsIn<CoPo>('co_po_map', 'co_id', cos.map((c) => c.id)) };
+      const id = offering!.id;
+      const cos = await rows<CourseOutcome>(supabase.from('course_outcomes').select('*').eq('offering_id', id).order('sort'));
+      const [coPo, attainment, car, files, prev] = await Promise.all([
+        rowsIn<CoPo>('co_po_map', 'co_id', cos.map((c) => c.id)),
+        rows<ObeAttainment>(supabase.from('obe_attainment').select('*').eq('offering_id', id)),
+        rows<CarReport>(supabase.from('car_reports').select('*').eq('offering_id', id)),
+        rows<CourseFileItem>(supabase.from('course_file_items').select('*').eq('offering_id', id)),
+        previousOffering(offering!, term!),
+      ]);
+      return { cos, coPo, attainment, car: car[0] ?? null, files, prev };
     },
   });
 }
+
+// ---------------------------------------------------------------- OBE across the term (dashboard), program PO, BUGS, CQI
+export interface ObeTerm { cos: Pick<CourseOutcome, 'id' | 'offering_id' | 'code'>[]; coPo: CoPo[]; attainment: ObeAttainment[]; cars: Pick<CarReport, 'offering_id' | 'status'>[]; files: CourseFileItem[] }
+export function useObeTerm(termId: string | undefined, offeringIds: string[]) {
+  return useQuery({
+    queryKey: ['obeTerm', termId, offeringIds.length], enabled: !!termId,
+    queryFn: async (): Promise<ObeTerm> => {
+      const cos = await rowsIn<Pick<CourseOutcome, 'id' | 'offering_id' | 'code'>>('course_outcomes', 'offering_id', offeringIds, 'id, offering_id, code');
+      const [coPo, attainment, cars, files] = await Promise.all([
+        rowsIn<CoPo>('co_po_map', 'co_id', cos.map((c) => c.id)),
+        rowsIn<ObeAttainment>('obe_attainment', 'offering_id', offeringIds),
+        rowsIn<Pick<CarReport, 'offering_id' | 'status'>>('car_reports', 'offering_id', offeringIds, 'offering_id, status'),
+        rowsIn<CourseFileItem>('course_file_items', 'offering_id', offeringIds),
+      ]);
+      return { cos, coPo, attainment, cars, files };
+    },
+  });
+}
+export const useProgramPo = () => useQuery({ queryKey: ['programPo'], queryFn: () => rows<ProgramPo>(supabase.from('v_program_po').select('*')) });
+export const useBugs = () => useQuery({ queryKey: ['bugs'], queryFn: () => rows<BugsResolution>(supabase.from('bugs_resolutions').select('*').order('held_on', { ascending: false, nullsFirst: false })) });
+export const useCqi = () => useQuery({ queryKey: ['cqi'], queryFn: () => rows<CqiItem>(supabase.from('cqi_items').select('*').order('created_at', { ascending: false })) });
 
 export const useItemHistory = (itemId: string | undefined) => useQuery({
   queryKey: ['history', itemId], enabled: !!itemId,
@@ -83,7 +129,7 @@ export function useWrite<A, R = unknown>(fn: (a: A) => Promise<R>) {
   return useMutation<R, Error, A>({
     mutationFn: async (a: A) => { try { return await fn(a); } catch (e) { throw new Error(humanError(e)); } },
     // Writes are rare and the department dataset is small, so refreshing every cached view is cheap and never stale.
-    onSuccess: () => { for (const k of ['term', 'terms', 'obe', 'history', 'faculty', 'courses', 'allowed', 'coverage']) qc.invalidateQueries({ queryKey: [k] }); },
+    onSuccess: () => { for (const k of ['term', 'terms', 'obe', 'obeTerm', 'programPo', 'bugs', 'cqi', 'history', 'faculty', 'courses', 'allowed', 'coverage']) qc.invalidateQueries({ queryKey: [k] }); },
   });
 }
 
