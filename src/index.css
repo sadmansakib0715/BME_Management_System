@@ -2,34 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tokens: Swiss-minimal, dense dashboard. Teal is the only brand colour; status colours always come with text. */
+/* Tokens: bright forest. Leaf green is the brand; sun, moss and sky are accents for decoration only.
+   Status colours always come with text. Theme is chosen by data-theme on <html> (set in index.html + src/lib/theme.ts). */
 @layer base {
   :root {
-    --bg: 248 250 252; --surface: 255 255 255; --sunken: 241 245 249;
-    --line: 226 232 240; --line-strong: 203 213 225;
-    --ink: 15 23 42; --muted: 71 85 105; --subtle: 100 116 139;
-    --brand: 15 118 110; --brand-ink: 17 94 89; --brand-soft: 236 253 245; --brand-fg: 255 255 255;
-    --ok: 21 128 61; --ok-soft: 240 253 244;
-    --warn: 180 83 9; --warn-soft: 255 247 230;
-    --bad: 185 28 28; --bad-soft: 254 242 242;
-    --info: 29 78 216; --info-soft: 239 246 255;
+    --bg: 242 248 239; --surface: 255 255 255; --sunken: 234 244 231;
+    --line: 218 232 214; --line-strong: 187 211 182;
+    --ink: 20 38 28; --muted: 61 89 72; --subtle: 88 116 100;
+    --brand: 21 128 61; --brand-ink: 22 101 52; --brand-soft: 220 247 226; --brand-fg: 255 255 255;
+    --leaf: 101 163 13; --sun: 245 158 11; --sky: 14 165 233; --canopy: 20 83 45; --canopy-fg: 255 255 255;
+    --ok: 4 120 87; --ok-soft: 222 247 236; --ok-fg: 255 255 255;
+    --warn: 180 83 9; --warn-soft: 255 245 219;
+    --bad: 190 18 60; --bad-soft: 255 236 240; --bad-fg: 255 255 255;
+    --info: 3 105 161; --info-soft: 227 244 253;
+    --shade: 20 60 35;
     color-scheme: light;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: 10 14 19; --surface: 16 21 28; --sunken: 22 28 37;
-      --line: 36 44 56; --line-strong: 53 63 79;
-      --ink: 226 232 240; --muted: 160 174 192; --subtle: 128 142 162;
-      --brand: 45 212 191; --brand-ink: 94 234 212; --brand-soft: 17 45 42; --brand-fg: 4 47 46;
-      --ok: 74 222 128; --ok-soft: 18 44 30;
-      --warn: 251 191 36; --warn-soft: 48 36 10;
-      --bad: 248 113 113; --bad-soft: 54 20 22;
-      --info: 96 165 250; --info-soft: 19 33 61;
-      color-scheme: dark;
-    }
+  :root[data-theme="dark"] {
+    --bg: 12 26 18; --surface: 18 36 26; --sunken: 24 47 33;
+    --line: 35 63 45; --line-strong: 52 86 64;
+    --ink: 230 242 232; --muted: 172 196 179; --subtle: 138 166 148;
+    --brand: 74 222 128; --brand-ink: 134 239 172; --brand-soft: 22 58 36; --brand-fg: 5 46 22;
+    --leaf: 163 230 53; --sun: 251 191 36; --sky: 56 189 248; --canopy: 8 33 20; --canopy-fg: 236 252 240;
+    --ok: 52 211 153; --ok-soft: 15 52 39; --ok-fg: 2 44 34;
+    --warn: 251 191 36; --warn-soft: 52 40 12;
+    --bad: 251 113 133; --bad-soft: 62 20 30; --bad-fg: 76 5 25;
+    --info: 56 189 248; --info-soft: 12 42 60;
+    --shade: 0 0 0;
+    color-scheme: dark;
   }
   html { -webkit-text-size-adjust: 100%; }
-  body { @apply bg-bg text-ink font-sans antialiased; font-feature-settings: 'cv11', 'ss01'; }
+  body { @apply bg-bg text-ink font-sans antialiased; font-feature-settings: 'cv11', 'ss01';
+         /* Dappled canopy light: soft sun and leaf glows behind the white cards. */
+         background-image: radial-gradient(60rem 30rem at 100% -10%, rgb(var(--sun) / 0.10), transparent 60%),
+                           radial-gradient(50rem 30rem at -10% 110%, rgb(var(--leaf) / 0.10), transparent 60%);
+         background-attachment: fixed; }
   :focus-visible { outline: 2px solid rgb(var(--brand)); outline-offset: 2px; border-radius: 4px; }
   ::selection { background: rgb(var(--brand) / 0.2); }
   .tabular { font-variant-numeric: tabular-nums; }

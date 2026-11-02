@@ -36,13 +36,19 @@ export default function Login() {
 
   return (
     <div className="min-h-dvh grid lg:grid-cols-2">
-      <div className="hidden lg:flex flex-col justify-between bg-brand text-brand-fg p-10">
-        <div className="text-sm font-semibold tracking-wide opacity-90">Department of Biomedical Engineering · BUET</div>
-        <div>
+      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-gradient-to-br from-canopy via-brand-ink to-brand text-canopy-fg p-10 dark:via-canopy dark:to-brand-soft">
+        <svg className="absolute inset-x-0 bottom-0 w-full h-1/2 pointer-events-none" viewBox="0 0 800 400" preserveAspectRatio="xMidYMax slice" aria-hidden>
+          <circle cx="640" cy="120" r="70" className="fill-sun/30" />
+          <path d="M0 260 L60 170 L120 250 L190 140 L260 240 L330 160 L400 250 L470 130 L550 240 L620 170 L700 250 L800 150 V400 H0Z" className="fill-leaf/25" />
+          <path d="M0 320 L50 240 L110 310 L170 220 L240 320 L300 250 L370 330 L440 230 L510 320 L580 260 L650 330 L720 240 L800 320 V400 H0Z" className="fill-canopy/60" />
+          <path d="M0 400 V350 Q200 300 400 345 T800 330 V400Z" className="fill-canopy" />
+        </svg>
+        <div className="relative text-sm font-semibold tracking-wide opacity-90">Department of Biomedical Engineering · BUET</div>
+        <div className="relative">
           <h1 className="text-3xl font-semibold tracking-tight max-w-md">Every course, exam step and outcome in one place.</h1>
           <p className="mt-3 max-w-md opacity-85">Question papers, class tests, sessional assessments, marks and CO/PO attainment, tracked from the first week to the CAR.</p>
         </div>
-        <div className="text-2xs opacity-75">Access is limited to department faculty.</div>
+        <div className="relative text-2xs opacity-80">Access is limited to department faculty.</div>
       </div>
       <div className="flex items-center justify-center p-6">
         <form onSubmit={submit} className="w-full max-w-sm space-y-4" noValidate>

@@ -69,7 +69,7 @@ function TheoryExam({ offering, data }: TabProps) {
             return (
               <li key={def.key} className={clsx('px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2', st === 'locked' && 'bg-sunken/40')}>
                 <span className={clsx('size-7 rounded-full grid place-items-center text-2xs font-semibold shrink-0 border',
-                  st === 'done' ? 'bg-ok text-white border-ok' : st === 'locked' ? 'border-line text-subtle' : 'border-brand text-brand-ink')} aria-hidden>
+                  st === 'done' ? 'bg-ok text-ok-fg border-ok' : st === 'locked' ? 'border-line text-subtle' : 'border-brand text-brand-ink')} aria-hidden>
                   {st === 'done' ? <Check className="size-4" /> : st === 'locked' ? <Lock className="size-3.5" /> : idx + 1}
                 </span>
                 <div className="min-w-0 flex-1 basis-48">

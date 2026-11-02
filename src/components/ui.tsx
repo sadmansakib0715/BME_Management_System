@@ -15,7 +15,7 @@ export const Button = forwardRef<HTMLButtonElement, BtnProps>(function Button({ 
         variant === 'primary' && 'bg-brand text-brand-fg hover:bg-brand-ink',
         variant === 'secondary' && 'bg-surface text-ink border border-line-strong hover:bg-sunken',
         variant === 'ghost' && 'text-muted hover:text-ink hover:bg-sunken',
-        variant === 'danger' && 'bg-bad text-white hover:opacity-90', className)} {...rest}>
+        variant === 'danger' && 'bg-bad text-bad-fg hover:opacity-90', className)} {...rest}>
       {loading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : icon}
       {children}
     </button>
@@ -136,7 +136,7 @@ export function Dialog({ open, onClose, title, children, footer, wide }: { open:
   useEffect(() => { const d = ref.current; if (!d) return; if (open && !d.open) d.showModal(); if (!open && d.open) d.close(); }, [open]);
   return (
     <dialog ref={ref} aria-labelledby={id} onClose={onClose} onCancel={(e) => { e.preventDefault(); onClose(); }}
-      className={clsx('rounded-lg border border-line bg-surface text-ink shadow-pop p-0 backdrop:bg-slate-950/40 w-[calc(100%-2rem)]', wide ? 'max-w-3xl' : 'max-w-lg')}>
+      className={clsx('rounded-lg border border-line bg-surface text-ink shadow-pop p-0 backdrop:bg-canopy/50 backdrop:backdrop-blur-[2px] w-[calc(100%-2rem)]', wide ? 'max-w-3xl' : 'max-w-lg')}>
       {open && <>
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-line">
           <h2 id={id} className="text-base font-semibold">{title}</h2>

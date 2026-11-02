@@ -1,9 +1,10 @@
 import { clsx } from 'clsx';
-import { BookOpen, CalendarDays, ClipboardList, FileUp, Gauge, Home, LogOut, Menu, Settings2, Target, Unlock, Users, X } from 'lucide-react';
+import { BookOpen, CalendarDays, ClipboardList, FileUp, Gauge, Home, LogOut, Menu, Monitor, Moon, Settings2, Sun, Target, Unlock, Users, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
 import { useTerm } from '@/lib/TermContext';
+import { useTheme, type ThemePref } from '@/lib/theme';
 import { Select } from './ui';
 
 const DEPT = (import.meta.env.VITE_DEPT_NAME as string | undefined) ?? 'Department of BME, BUET';
@@ -11,9 +12,29 @@ const DEPT = (import.meta.env.VITE_DEPT_NAME as string | undefined) ?? 'Departme
 function Item({ to, icon, children, end }: { to: string; icon: ReactNode; children: ReactNode; end?: boolean }) {
   return (
     <NavLink to={to} end={end} className={({ isActive }) => clsx('flex items-center gap-2.5 h-9 px-2.5 rounded text-sm font-medium transition-colors duration-150 cursor-pointer',
-      isActive ? 'bg-brand-soft text-brand-ink' : 'text-muted hover:text-ink hover:bg-sunken')}>
+      isActive ? 'bg-brand text-brand-fg shadow-card' : 'text-muted hover:text-brand-ink hover:bg-brand-soft')}>
       <span className="size-4 shrink-0" aria-hidden>{icon}</span>{children}
     </NavLink>
+  );
+}
+
+function ThemeSwitch() {
+  const { pref, setPref } = useTheme();
+  const opts: { value: ThemePref; label: string; icon: ReactNode }[] = [
+    { value: 'light', label: 'Light', icon: <Sun className="size-4" /> },
+    { value: 'dark', label: 'Dark', icon: <Moon className="size-4" /> },
+    { value: 'system', label: 'System', icon: <Monitor className="size-4" /> },
+  ];
+  return (
+    <div role="radiogroup" aria-label="Colour theme" className="grid grid-cols-3 gap-0.5 rounded-lg border border-line bg-sunken p-0.5">
+      {opts.map((o) => (
+        <button key={o.value} type="button" role="radio" aria-checked={pref === o.value} onClick={() => setPref(o.value)} title={`${o.label} theme`}
+          className={clsx('h-8 flex items-center justify-center gap-1.5 rounded text-2xs font-medium transition-colors duration-150 cursor-pointer',
+            pref === o.value ? 'bg-surface text-brand-ink shadow-card' : 'text-muted hover:text-ink')}>
+          <span aria-hidden>{o.icon}</span>{o.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -22,9 +43,10 @@ function Sidebar() {
   const { terms, termId, setTermId, nameOf, faculty } = useTerm();
   return (
     <div className="flex flex-col h-full">
+      <div className="h-1 shrink-0 bg-gradient-to-r from-brand via-leaf to-sun" aria-hidden />
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-center gap-2">
-          <div className="size-7 rounded-md bg-brand text-brand-fg grid place-items-center" aria-hidden>
+          <div className="size-8 rounded-lg bg-gradient-to-br from-brand to-leaf text-brand-fg grid place-items-center shadow-card" aria-hidden>
             <svg viewBox="0 0 32 32" className="size-5"><path d="M6 17h5l2.5-7 5 14 2.5-7h5" stroke="currentColor" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </div>
           <div className="leading-tight"><div className="text-sm font-semibold">BME Workflow</div><div className="text-2xs text-subtle">{DEPT}</div></div>
@@ -48,6 +70,7 @@ function Sidebar() {
           <Item to="/admin/import" icon={<FileUp className="size-4" />}>Import workbook</Item>
         </>}
       </nav>
+      <div className="px-3 pt-3 pb-2"><ThemeSwitch /></div>
       {openAccess ? (
         <div className="border-t border-line p-3 space-y-2">
           <div className="flex items-start gap-1.5 rounded border border-warn/30 bg-warn-soft px-2 py-1.5 text-2xs text-warn">
@@ -62,7 +85,7 @@ function Sidebar() {
         </div>
       ) : (
       <div className="border-t border-line p-3 flex items-center gap-2">
-        <div className="size-8 rounded-full bg-sunken grid place-items-center text-2xs font-semibold text-muted" aria-hidden>
+        <div className="size-8 rounded-full bg-brand-soft grid place-items-center text-2xs font-semibold text-brand-ink" aria-hidden>
           {nameOf(me?.facultyId).replace(/^(Dr|Mr|Ms|Mrs|Prof)\.?\s+/, '').split(' ').map((p) => p[0]).slice(0, 2).join('')}
         </div>
         <div className="min-w-0 flex-1 leading-tight">
@@ -85,15 +108,15 @@ export function AppShell() {
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[248px_1fr]">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:px-3 focus:py-2 focus:bg-surface focus:rounded">Skip to content</a>
-      <aside className="hidden lg:block sticky top-0 h-dvh border-r border-line bg-surface"><Sidebar /></aside>
+      <aside className="hidden lg:block sticky top-0 h-dvh border-r border-line bg-surface bg-gradient-to-b from-brand-soft/60 via-surface to-surface"><Sidebar /></aside>
       <header className="lg:hidden sticky top-0 z-30 flex items-center gap-2 h-12 px-3 border-b border-line bg-surface/95 backdrop-blur" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <button onClick={() => setOpen(true)} className="size-10 grid place-items-center rounded hover:bg-sunken cursor-pointer" aria-label="Open menu" aria-expanded={open}><Menu className="size-5" aria-hidden /></button>
         <span className="text-sm font-semibold">BME Workflow</span>
       </header>
       {open && (
         <div className="lg:hidden fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-slate-950/40" onClick={() => setOpen(false)} aria-hidden />
-          <div className="absolute inset-y-0 left-0 w-72 max-w-[85%] bg-surface border-r border-line shadow-pop">
+          <div className="absolute inset-0 bg-canopy/50 backdrop-blur-[2px]" onClick={() => setOpen(false)} aria-hidden />
+          <div className="absolute inset-y-0 left-0 w-72 max-w-[85%] bg-surface bg-gradient-to-b from-brand-soft/60 via-surface to-surface border-r border-line shadow-pop">
             <button onClick={() => setOpen(false)} className="absolute right-2 top-2 size-10 grid place-items-center rounded hover:bg-sunken cursor-pointer" aria-label="Close menu"><X className="size-5" aria-hidden /></button>
             <Sidebar />
           </div>
