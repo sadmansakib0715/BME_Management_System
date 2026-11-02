@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tokens: Swiss-minimal, dense dashboard. Teal is the only brand colour; status colours always come with text. */
+@layer base {
+  :root {
+    --bg: 248 250 252; --surface: 255 255 255; --sunken: 241 245 249;
+    --line: 226 232 240; --line-strong: 203 213 225;
+    --ink: 15 23 42; --muted: 71 85 105; --subtle: 100 116 139;
+    --brand: 15 118 110; --brand-ink: 17 94 89; --brand-soft: 236 253 245; --brand-fg: 255 255 255;
+    --ok: 21 128 61; --ok-soft: 240 253 244;
+    --warn: 180 83 9; --warn-soft: 255 247 230;
+    --bad: 185 28 28; --bad-soft: 254 242 242;
+    --info: 29 78 216; --info-soft: 239 246 255;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: 10 14 19; --surface: 16 21 28; --sunken: 22 28 37;
+      --line: 36 44 56; --line-strong: 53 63 79;
+      --ink: 226 232 240; --muted: 160 174 192; --subtle: 128 142 162;
+      --brand: 45 212 191; --brand-ink: 94 234 212; --brand-soft: 17 45 42; --brand-fg: 4 47 46;
+      --ok: 74 222 128; --ok-soft: 18 44 30;
+      --warn: 251 191 36; --warn-soft: 48 36 10;
+      --bad: 248 113 113; --bad-soft: 54 20 22;
+      --info: 96 165 250; --info-soft: 19 33 61;
+      color-scheme: dark;
+    }
+  }
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-bg text-ink font-sans antialiased; font-feature-settings: 'cv11', 'ss01'; }
+  :focus-visible { outline: 2px solid rgb(var(--brand)); outline-offset: 2px; border-radius: 4px; }
+  ::selection { background: rgb(var(--brand) / 0.2); }
+  .tabular { font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+@layer components {
+  .card { @apply bg-surface border border-line rounded-lg shadow-card; }
+  .input { @apply w-full h-9 rounded border border-line-strong bg-surface px-2.5 text-sm text-ink placeholder:text-subtle
+           transition-colors duration-150 hover:border-subtle focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25
+           disabled:opacity-60 disabled:cursor-not-allowed; }
+  .table { @apply w-full text-sm border-collapse; }
+  :where(.table) th { @apply text-left text-2xs font-semibold uppercase tracking-wide text-subtle px-3 py-2 border-b border-line bg-sunken/60 whitespace-nowrap; }
+  :where(.table) td { @apply px-3 py-2 border-b border-line align-middle; }
+  :where(.table) tbody tr { @apply transition-colors duration-150; }
+  :where(.table) tbody tr:hover { @apply bg-sunken/50; }
+  .link { @apply text-brand-ink font-medium underline-offset-2 hover:underline cursor-pointer; }
+  .kbd { @apply font-mono text-2xs px-1.5 py-0.5 rounded border border-line bg-sunken text-muted; }
+}
