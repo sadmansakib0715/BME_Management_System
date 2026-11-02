@@ -22,8 +22,9 @@ export function TermProvider({ children }: { children: ReactNode }) {
     try { return localStorage.getItem(KEY) ?? undefined; } catch { return undefined; }
   });
   useEffect(() => {
-    const list = terms.data ?? [];
-    if (!list.length) return;
+    if (!terms.data) return;
+    const list = terms.data;
+    if (!list.length) { if (termId) setTermIdState(undefined); return; } // e.g. the last term was deleted
     if (!termId || !list.some((t) => t.id === termId)) setTermIdState((list.find((t) => t.is_current) ?? list[0]).id);
   }, [terms.data, termId]);
   const setTermId = (id: string) => { setTermIdState(id); try { localStorage.setItem(KEY, id); } catch { /* private mode */ } };

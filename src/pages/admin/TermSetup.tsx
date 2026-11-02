@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { FileSpreadsheet, Minus, Pause, Play, Plus, SlidersHorizontal } from 'lucide-react';
+import { FileSpreadsheet, Minus, Pause, Play, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { Link, NavLink, useParams } from 'react-router-dom';
 import { Button, Card, CardHeader, Dialog, ErrorNote, Field, Input, PageHeader, Spinner, useToast } from '@/components/ui';
@@ -119,6 +119,10 @@ function TermDates({ term: t }: { term: Term }) {
   const setMilestone = useWrite((a: { kind: MilestoneKind; due_on: string }) => a.due_on
     ? must(supabase.from('term_milestones').upsert({ term_id: t.id, offering_id: null, kind: a.kind, due_on: a.due_on }, { onConflict: 'term_id,offering_id,kind' }))
     : must(supabase.from('term_milestones').delete().eq('term_id', t.id).eq('kind', a.kind).is('offering_id', null)));
+  // Everything belonging to the term (courses, sections, roles, workflow, plans, dates, outcomes) cascades in the database.
+  const deleteTerm = useWrite(() => must(supabase.from('terms').delete().eq('id', t.id)));
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [typed, setTyped] = useState('');
 
   return (
     <div className="grid gap-5 xl:grid-cols-2">
@@ -162,6 +166,23 @@ function TermDates({ term: t }: { term: Term }) {
                 if (e.target.value !== prev) setMilestone.mutate({ kind: k, due_on: e.target.value }, { onSuccess: () => toast('ok', `${l}: saved`), onError: err }); }} />
           </li>))}</ul>
       </Card>
+      <Card className="xl:col-span-2 border-bad/30">
+        <div className="p-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Delete this term</h2>
+            <p className="text-sm text-muted mt-0.5">Removes {t.name} and everything in it: {data!.offerings.length} course{data!.offerings.length === 1 ? '' : 's'}, their sections, roles, exam workflow, plans, class-test dates and course outcomes. This cannot be undone.</p>
+          </div>
+          <Button variant="danger" icon={<Trash2 className="size-4" aria-hidden />} onClick={() => { setTyped(''); setConfirmDelete(true); }}>Delete term</Button>
+        </div>
+      </Card>
+      <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)} title={`Delete ${t.name}?`}
+        footer={<><Button onClick={() => setConfirmDelete(false)}>Keep the term</Button><Button variant="danger" disabled={typed.trim() !== t.code} loading={deleteTerm.isPending}
+          onClick={() => deleteTerm.mutate(undefined, { onSuccess: () => { toast('ok', `${t.name} deleted`); setConfirmDelete(false); }, onError: err })}>Delete permanently</Button></>}>
+        <p className="text-sm text-muted">All {data!.offerings.length} course{data!.offerings.length === 1 ? '' : 's'} of this term and their workflow, plans, dates and outcomes will be deleted. The course catalog and faculty list are not affected.{t.is_current ? ' This is the current term; make another term current afterwards.' : ''}</p>
+        <Field label={<>Type <span className="font-mono font-semibold">{t.code}</span> to confirm</>} htmlFor="del-code">
+          <Input id="del-code" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} />
+        </Field>
+      </Dialog>
     </div>
   );
 }
