@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
 import { AppShell } from './components/AppShell';
 import { Button, Empty, Spinner } from './components/ui';
@@ -16,14 +16,31 @@ const Assignments = lazy(() => import('./pages/admin/Assignments'));
 const TermSetup = lazy(() => import('./pages/admin/TermSetup'));
 const People = lazy(() => import('./pages/admin/People'));
 const ImportPage = lazy(() => import('./pages/admin/Import'));
+const Guide = lazy(() => import('./pages/Guide'));
 
 function AdminOnly({ children }: { children: ReactNode }) {
   const { isAdmin } = useAuth();
   return isAdmin ? <>{children}</> : <Empty title="Admins only">This page is for the HOD and department admins.</Empty>;
 }
 
+/** The guide, readable before signing in (linked from the sign-in page). */
+function PublicGuide() {
+  return (
+    <div className="min-h-dvh">
+      <header className="sticky top-0 z-30 h-14 flex items-center justify-between px-4 sm:px-6 border-b border-line bg-surface/90 backdrop-blur">
+        <span className="text-sm font-semibold">BME Workflow</span>
+        <Link to="/" className="link text-sm">Sign in</Link>
+      </header>
+      <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-[1200px] mx-auto">
+        <Suspense fallback={<Spinner />}><Guide signedOut /></Suspense>
+      </main>
+    </div>
+  );
+}
+
 export default function App() {
-  const { session, me, loading, error, retry, signOut, openAccess } = useAuth();
+  const { session, me, loading, error, retry, signOut, openAccess, isAdmin } = useAuth();
+  const { pathname } = useLocation();
   if (loading) return <Spinner label="Signing in" />;
   if (error) return (
     <div className="min-h-dvh grid place-items-center p-6">
@@ -32,7 +49,7 @@ export default function App() {
       </Empty>
     </div>
   );
-  if (!openAccess && !session) return <Login />;
+  if (!openAccess && !session) return pathname === '/guide' ? <PublicGuide /> : <Login />;
   if (!me) return (
     <div className="min-h-dvh grid place-items-center p-6">
       <Empty title="Your account is not approved yet" action={<Button onClick={signOut}>Sign out</Button>}>
@@ -50,6 +67,7 @@ export default function App() {
             <Route path="courses/:id/:tab?" element={<CourseDetail />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="outcomes" element={<Outcomes />} />
+            <Route path="guide" element={<Guide isAdmin={isAdmin} />} />
             <Route path="dashboard" element={<AdminOnly><Dashboard /></AdminOnly>} />
             <Route path="admin/assignments" element={<AdminOnly><Assignments /></AdminOnly>} />
             <Route path="admin/term" element={<AdminOnly><TermSetup /></AdminOnly>} />

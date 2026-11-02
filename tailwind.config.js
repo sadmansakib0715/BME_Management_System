@@ -11,7 +11,7 @@ export default {
         bg: v('bg'), surface: v('surface'), sunken: v('sunken'), line: v('line'), 'line-strong': v('line-strong'),
         ink: v('ink'), muted: v('muted'), subtle: v('subtle'),
         brand: { DEFAULT: v('brand'), ink: v('brand-ink'), soft: v('brand-soft'), fg: v('brand-fg') },
-        leaf: v('leaf'), sun: v('sun'), sky: v('sky'), canopy: { DEFAULT: v('canopy'), fg: v('canopy-fg') },
+        wash: v('wash'), mist: v('mist'), hero: { DEFAULT: v('hero'), fg: v('hero-fg') },
         ok: { DEFAULT: v('ok'), soft: v('ok-soft'), fg: v('ok-fg') }, warn: { DEFAULT: v('warn'), soft: v('warn-soft') },
         bad: { DEFAULT: v('bad'), soft: v('bad-soft'), fg: v('bad-fg') }, info: { DEFAULT: v('info'), soft: v('info-soft') },
       },

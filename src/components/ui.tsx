@@ -1,6 +1,6 @@
 import { clsx } from 'clsx';
 import { AlertTriangle, CheckCircle2, CircleDashed, Clock3, Loader2, Lock, X, XCircle } from 'lucide-react';
-import { createContext, forwardRef, useCallback, useContext, useEffect, useId, useRef, useState,
+import { createContext, forwardRef, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState,
   type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 
 // ---------------------------------------------------------------- Button
@@ -136,7 +136,7 @@ export function Dialog({ open, onClose, title, children, footer, wide }: { open:
   useEffect(() => { const d = ref.current; if (!d) return; if (open && !d.open) d.showModal(); if (!open && d.open) d.close(); }, [open]);
   return (
     <dialog ref={ref} aria-labelledby={id} onClose={onClose} onCancel={(e) => { e.preventDefault(); onClose(); }}
-      className={clsx('rounded-lg border border-line bg-surface text-ink shadow-pop p-0 backdrop:bg-canopy/50 backdrop:backdrop-blur-[2px] w-[calc(100%-2rem)]', wide ? 'max-w-3xl' : 'max-w-lg')}>
+      className={clsx('rounded-lg border border-line bg-surface text-ink shadow-pop p-0 backdrop:bg-hero/50 backdrop:backdrop-blur-[2px] w-[calc(100%-2rem)]', wide ? 'max-w-3xl' : 'max-w-lg')}>
       {open && <>
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-line">
           <h2 id={id} className="text-base font-semibold">{title}</h2>
@@ -178,12 +178,21 @@ export const useToast = () => useContext(ToastCtx);
 
 // ---------------------------------------------------------------- Tabs (link-based for deep linking)
 export function SegTabs<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: { value: T; label: ReactNode }[]; label: string }) {
+  // Sliding thumb: measured from the selected tab so labels of any width work.
+  const wrap = useRef<HTMLDivElement>(null);
+  const [thumb, setThumb] = useState<{ x: number; w: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = wrap.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (el) setThumb({ x: el.offsetLeft, w: el.offsetWidth });
+  }, [value, options.length]);
   return (
-    <div role="tablist" aria-label={label} className="inline-flex rounded border border-line bg-sunken p-0.5">
+    <div ref={wrap} role="tablist" aria-label={label} className="relative inline-flex rounded border border-line bg-sunken p-0.5">
+      {thumb && <span aria-hidden className="absolute top-0.5 bottom-0.5 left-0 rounded bg-surface shadow-card transition-[transform,width] duration-300 ease-[cubic-bezier(.34,1.56,.64,1)]"
+        style={{ width: thumb.w, transform: `translateX(${thumb.x}px)` }} />}
       {options.map((o) => (
         <button key={o.value} role="tab" aria-selected={value === o.value} onClick={() => onChange(o.value)}
-          className={clsx('h-7 px-3 rounded text-sm font-medium cursor-pointer transition-colors duration-150',
-            value === o.value ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink')}>{o.label}</button>
+          className={clsx('relative h-7 px-3 rounded text-sm font-medium cursor-pointer transition-colors duration-150',
+            value === o.value ? clsx('text-ink', !thumb && 'bg-surface shadow-card') : 'text-muted hover:text-ink')}>{o.label}</button>
       ))}
     </div>
   );

@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { BookOpen, CalendarDays, ClipboardList, FileUp, Gauge, Home, LogOut, Menu, Monitor, Moon, Settings2, Sun, Target, Unlock, Users, X } from 'lucide-react';
+import { BookOpen, CalendarDays, ClipboardList, Compass, FileUp, Gauge, Home, LogOut, Menu, Monitor, Moon, Settings2, Sun, Target, Unlock, Users, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
@@ -25,13 +25,16 @@ function ThemeSwitch() {
     { value: 'dark', label: 'Dark', icon: <Moon className="size-4" /> },
     { value: 'system', label: 'System', icon: <Monitor className="size-4" /> },
   ];
+  const idx = opts.findIndex((o) => o.value === pref);
   return (
-    <div role="radiogroup" aria-label="Colour theme" className="grid grid-cols-3 gap-0.5 rounded-lg border border-line bg-sunken p-0.5">
+    <div role="radiogroup" aria-label="Colour theme" className="relative grid grid-cols-3 rounded-lg border border-line bg-sunken p-0.5">
+      <span aria-hidden className="absolute top-0.5 bottom-0.5 left-0.5 w-[calc((100%-0.25rem)/3)] rounded bg-surface shadow-card transition-transform duration-300 ease-[cubic-bezier(.34,1.56,.64,1)]"
+        style={{ transform: `translateX(${idx * 100}%)` }} />
       {opts.map((o) => (
         <button key={o.value} type="button" role="radio" aria-checked={pref === o.value} onClick={() => setPref(o.value)} title={`${o.label} theme`}
-          className={clsx('h-8 flex items-center justify-center gap-1.5 rounded text-2xs font-medium transition-colors duration-150 cursor-pointer',
-            pref === o.value ? 'bg-surface text-brand-ink shadow-card' : 'text-muted hover:text-ink')}>
-          <span aria-hidden>{o.icon}</span>{o.label}
+          className={clsx('relative h-8 flex items-center justify-center gap-1.5 rounded text-2xs font-medium transition-colors duration-150 cursor-pointer',
+            pref === o.value ? 'text-brand-ink' : 'text-muted hover:text-ink')}>
+          <span aria-hidden className={clsx('transition-transform duration-300', pref === o.value && 'rotate-[360deg]')}>{o.icon}</span>{o.label}
         </button>
       ))}
     </div>
@@ -43,10 +46,10 @@ function Sidebar() {
   const { terms, termId, setTermId, nameOf, faculty } = useTerm();
   return (
     <div className="flex flex-col h-full">
-      <div className="h-1 shrink-0 bg-gradient-to-r from-brand via-leaf to-sun" aria-hidden />
+      <div className="h-1 shrink-0 bg-gradient-to-r from-hero via-wash to-mist" aria-hidden />
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-center gap-2">
-          <div className="size-8 rounded-lg bg-gradient-to-br from-brand to-leaf text-brand-fg grid place-items-center shadow-card" aria-hidden>
+          <div className="size-8 rounded-lg bg-gradient-to-br from-hero to-wash text-hero-fg grid place-items-center shadow-card" aria-hidden>
             <svg viewBox="0 0 32 32" className="size-5"><path d="M6 17h5l2.5-7 5 14 2.5-7h5" stroke="currentColor" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </div>
           <div className="leading-tight"><div className="text-sm font-semibold">BME Workflow</div><div className="text-2xs text-subtle">{DEPT}</div></div>
@@ -61,6 +64,7 @@ function Sidebar() {
         <Item to="/courses" icon={<BookOpen className="size-4" />}>Courses</Item>
         <Item to="/calendar" icon={<CalendarDays className="size-4" />}>Calendar</Item>
         <Item to="/outcomes" icon={<Target className="size-4" />}>Outcomes (OBE)</Item>
+        <Item to="/guide" icon={<Compass className="size-4" />}>How it works</Item>
         {isAdmin && <>
           <div className="pt-4 pb-1 px-2.5 text-2xs font-semibold uppercase tracking-wider text-subtle">Department</div>
           <Item to="/dashboard" icon={<Gauge className="size-4" />}>Overview</Item>
@@ -115,7 +119,7 @@ export function AppShell() {
       </header>
       {open && (
         <div className="lg:hidden fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-canopy/50 backdrop-blur-[2px]" onClick={() => setOpen(false)} aria-hidden />
+          <div className="absolute inset-0 bg-hero/50 backdrop-blur-[2px]" onClick={() => setOpen(false)} aria-hidden />
           <div className="absolute inset-y-0 left-0 w-72 max-w-[85%] bg-surface bg-gradient-to-b from-brand-soft/60 via-surface to-surface border-r border-line shadow-pop">
             <button onClick={() => setOpen(false)} className="absolute right-2 top-2 size-10 grid place-items-center rounded hover:bg-sunken cursor-pointer" aria-label="Close menu"><X className="size-5" aria-hidden /></button>
             <Sidebar />

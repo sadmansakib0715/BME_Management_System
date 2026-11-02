@@ -1,0 +1,137 @@
+import { ArrowRight, BellRing, BookOpen, ClipboardCheck, FileSpreadsheet, GraduationCap, History, LineChart, Lock, ShieldCheck, Target, UserCog, Users } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { IllCalendar, IllDepartment, IllExamChain, IllImport, IllMarks, IllOutcomes, IllPlan, IllTasks, InkMountains } from '@/components/illustrations';
+
+/** "How it works": a short illustrated tour of the whole system. Shown in the app and, signed out, from the sign-in page. */
+
+const FLOW: { icon: ReactNode; title: string; text: string; who: string }[] = [
+  { icon: <FileSpreadsheet />, title: 'Load the term', text: 'Import the Activity Tracker workbook. Every fix is previewed before anything is saved.', who: 'Admin' },
+  { icon: <UserCog />, title: 'Assign roles', text: 'Teachers, question setters, moderators and scrutinizers per course. Conflicts are blocked.', who: 'Admin' },
+  { icon: <BookOpen />, title: 'Set up courses', text: 'Add students, write course outcomes and build the assessment plan.', who: 'Faculty' },
+  { icon: <ClipboardCheck />, title: 'Run the term', text: 'Class tests and exam steps unlock in order. Everyone sees their next task.', who: 'Everyone' },
+  { icon: <GraduationCap />, title: 'Enter marks', text: 'Paste from Excel, verify, publish and lock. Every change is logged.', who: 'Faculty' },
+  { icon: <Target />, title: 'Measure outcomes', text: 'CO and PO attainment is computed from published marks, ready for the CAR.', who: 'Automatic' },
+];
+
+const FEATURES: { art: ReactNode; title: string; text: string; to: string; admin?: boolean }[] = [
+  { art: <IllTasks />, title: 'My work', text: 'One task list per person, ordered by urgency, showing who you are waiting on.', to: '/' },
+  { art: <IllExamChain />, title: 'Theory exam chain', text: 'Question papers → moderation → printing → scripts → scrutiny → gradesheet → HOD, with correction rounds.', to: '/courses' },
+  { art: <IllCalendar />, title: 'Class tests & calendar', text: 'Dates with history, and a hard stop on two class tests for one cohort on the same day.', to: '/calendar' },
+  { art: <IllPlan />, title: 'Assessment plans', text: 'Components, weights and best-N per course or sessional sub-section; items are generated for you.', to: '/courses' },
+  { art: <IllMarks />, title: 'Marks', text: 'A grid per item with checks against question maxima: Entering → Verified → Published → Locked.', to: '/courses' },
+  { art: <IllOutcomes />, title: 'Outcomes (OBE)', text: 'CO–PO mapping by strength, attainment against the term thresholds, and program-level coverage.', to: '/outcomes' },
+  { art: <IllDepartment />, title: 'Department overview', text: 'For the HOD: exam funnel, course health, workload and setup gaps at a glance.', to: '/dashboard', admin: true },
+  { art: <IllImport />, title: 'Workbook import', text: 'Reads the existing spreadsheet in the browser, cleans names and dates, and flags what needs review.', to: '/admin/import', admin: true },
+];
+
+const ROLES: { icon: ReactNode; title: string; points: string[] }[] = [
+  { icon: <Users />, title: 'Faculty', points: ['See your tasks on My work', 'Manage rosters, COs and assessment plans', 'Enter and publish marks'] },
+  { icon: <ClipboardCheck />, title: 'Exam roles', points: ['Prepare, moderate or scrutinize papers', 'Return a paper for correction', 'Steps unlock only when the previous one is done'] },
+  { icon: <LineChart />, title: 'HOD & admins', points: ['Set up terms and thresholds', 'Assign roles and manage access', 'Track the whole department'] },
+];
+
+const SAFEGUARDS: { icon: ReactNode; title: string; text: string }[] = [
+  { icon: <ShieldCheck />, title: 'Rules live in the database', text: 'Order of steps, who owns them and clash checks hold even outside the app.' },
+  { icon: <Lock />, title: 'Marks stay private', text: 'Only a course’s teachers, its exam-role holders and admins can see student marks.' },
+  { icon: <History />, title: 'Everything is audited', text: 'Changes to assignments, tasks, marks and access are logged with before and after values.' },
+  { icon: <BellRing />, title: 'Reminders by email', text: 'When a step unlocks, a paper comes back, or a deadline is 7, 3 or 1 days away and on the day.' },
+];
+
+const Icon = ({ children }: { children: ReactNode }) => (
+  <span className="size-10 shrink-0 rounded-full bg-brand-soft text-brand-ink grid place-items-center [&>svg]:size-5" aria-hidden>{children}</span>
+);
+
+export default function Guide({ signedOut = false, isAdmin = false }: { signedOut?: boolean; isAdmin?: boolean }) {
+  return (
+    <div className="space-y-10 pb-6">
+      <section className="relative overflow-hidden rounded-lg bg-hero text-hero-fg px-6 pt-8 pb-28 sm:px-10 sm:pt-12 sm:pb-36 shadow-pop">
+        <InkMountains className="absolute inset-x-0 bottom-0 w-full h-48 sm:h-60 pointer-events-none" />
+        <div className="relative max-w-2xl">
+          <div className="text-2xs font-semibold uppercase tracking-wider opacity-80">How it works</div>
+          <h1 className="mt-2 text-2xl sm:text-3xl font-semibold tracking-tight">One place for every course, exam step and outcome.</h1>
+          <p className="mt-3 text-sm sm:text-base opacity-90">
+            BME Workflow replaces the term’s Activity Tracker spreadsheet. It follows each course from the first week to the
+            Course Assessment Report: who does what, what is due, the marks, and how well students reached the course and program outcomes.
+          </p>
+          {signedOut && (
+            <Link to="/" className="mt-5 inline-flex items-center gap-1.5 h-10 px-4 rounded bg-hero-fg text-hero text-sm font-semibold hover:opacity-90 transition-opacity duration-150">
+              Sign in<ArrowRight className="size-4" aria-hidden />
+            </Link>
+          )}
+        </div>
+      </section>
+
+      <section aria-labelledby="g-flow">
+        <h2 id="g-flow" className="text-lg font-semibold tracking-tight">A term, start to finish</h2>
+        <p className="text-sm text-muted mt-1">Six stages. Each one unlocks the next.</p>
+        <ol className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {FLOW.map((f, i) => (
+            <li key={f.title} className="card p-4 flex gap-3">
+              <Icon>{f.icon}</Icon>
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="font-mono text-2xs text-subtle">{String(i + 1).padStart(2, '0')}</span>
+                  <h3 className="text-sm font-semibold">{f.title}</h3>
+                  <span className="text-2xs font-medium text-brand-ink bg-brand-soft rounded px-1.5 py-0.5">{f.who}</span>
+                </div>
+                <p className="text-sm text-muted mt-1">{f.text}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section aria-labelledby="g-features">
+        <h2 id="g-features" className="text-lg font-semibold tracking-tight">What’s inside</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {FEATURES.map((f) => {
+            const canOpen = !signedOut && (!f.admin || isAdmin);
+            const body = (
+              <>
+                <div className="bg-sunken/70 border-b border-line">{f.art}</div>
+                <div className="p-4">
+                  <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                    {f.title}
+                    {f.admin && <span className="text-2xs font-medium text-subtle">· HOD & admins</span>}
+                  </h3>
+                  <p className="text-sm text-muted mt-1">{f.text}</p>
+                  {canOpen && <span className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand-ink">Open<ArrowRight className="size-3.5 transition-transform duration-150 group-hover:translate-x-0.5" aria-hidden /></span>}
+                </div>
+              </>
+            );
+            return canOpen
+              ? <Link key={f.title} to={f.to} className="group card overflow-hidden hover:border-brand/40 hover:shadow-pop transition-shadow duration-200">{body}</Link>
+              : <div key={f.title} className="card overflow-hidden">{body}</div>;
+          })}
+        </div>
+      </section>
+
+      <section aria-labelledby="g-roles">
+        <h2 id="g-roles" className="text-lg font-semibold tracking-tight">Who does what</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {ROLES.map((r) => (
+            <div key={r.title} className="card p-4">
+              <div className="flex items-center gap-3"><Icon>{r.icon}</Icon><h3 className="text-sm font-semibold">{r.title}</h3></div>
+              <ul className="mt-3 space-y-1.5 text-sm text-muted">
+                {r.points.map((p) => <li key={p} className="flex gap-2"><span className="mt-2 size-1.5 rounded-full bg-wash shrink-0" aria-hidden />{p}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="g-safe">
+        <h2 id="g-safe" className="text-lg font-semibold tracking-tight">Built-in safeguards</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {SAFEGUARDS.map((s) => (
+            <div key={s.title} className="flex gap-3 p-4 rounded-lg border border-line bg-surface/70">
+              <Icon>{s.icon}</Icon>
+              <div><h3 className="text-sm font-semibold">{s.title}</h3><p className="text-sm text-muted mt-0.5">{s.text}</p></div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
