@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
 import { AppShell } from './components/AppShell';
+import { DeptLayout } from './components/DeptLayout';
 import { Button, Empty, Spinner } from './components/ui';
 import { TermProvider } from './lib/TermContext';
 import Login from './pages/Login';
@@ -63,12 +64,14 @@ export default function App() {
         <Routes>
           <Route element={<AppShell />}>
             <Route index element={<Home />} />
-            <Route path="courses" element={<Courses />} />
+            <Route element={<DeptLayout />}>
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="courses" element={<Courses />} />
+              <Route path="calendar" element={<Calendar />} />
+              <Route path="outcomes" element={<Outcomes />} />
+            </Route>
             <Route path="courses/:id/:tab?" element={<CourseDetail />} />
-            <Route path="calendar" element={<Calendar />} />
-            <Route path="outcomes" element={<Outcomes />} />
             <Route path="guide" element={<Guide isAdmin={isAdmin} />} />
-            <Route path="dashboard" element={<AdminOnly><Dashboard /></AdminOnly>} />
             <Route path="admin/assignments" element={<AdminOnly><Assignments /></AdminOnly>} />
             <Route path="admin/term" element={<AdminOnly><TermSetup /></AdminOnly>} />
             <Route path="admin/people" element={<AdminOnly><People /></AdminOnly>} />

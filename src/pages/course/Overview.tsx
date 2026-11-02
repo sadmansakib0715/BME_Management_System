@@ -1,16 +1,10 @@
 import { useAuth } from '@/auth/AuthProvider';
-import { DueLabel } from '@/components/bits';
 import { Card, CardHeader, Select, useToast } from '@/components/ui';
 import { must, useWrite } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
-import { milestone } from '@/lib/tasks';
 import { useTerm } from '@/lib/TermContext';
 import { CAR_STATUS, FEEDBACK_STATUS, OUTLINE_STATUS, type StatusOption } from '@/lib/workflow';
-import type { MilestoneKind } from '@/lib/types';
 import type { TabProps } from './shared';
-
-const MILESTONES: [MilestoneKind, string][] = [['outline_sharing', 'Outline shared with students'], ['question_submission', 'Question submission'],
-  ['feedback_deadline', 'Student feedback'], ['theory_gradesheet', 'Theory gradesheet to HOD'], ['sessional_gradesheet', 'Sessional gradesheet'], ['car_deadline', 'Course File and CAR']];
 
 export default function Overview({ offering, course, data }: TabProps) {
   const { me, isAdmin } = useAuth();
@@ -20,7 +14,6 @@ export default function Overview({ offering, course, data }: TabProps) {
   const rec = data.records.find((r) => r.offering_id === offering.id);
   const save = useWrite((patch: Record<string, string>) => must(supabase.from('course_records').update({ ...patch, updated_at: new Date().toISOString() }).eq('offering_id', offering.id)));
   const sections = data.sections.filter((s) => s.offering_id === offering.id).sort((a, b) => a.name.localeCompare(b.name));
-  const relevant = MILESTONES.filter(([k]) => course.course_type === 'theory' ? k !== 'sessional_gradesheet' : !['question_submission', 'theory_gradesheet'].includes(k));
 
   const StatusRow = ({ label, field, opts }: { label: string; field: 'outline_status' | 'feedback_status' | 'car_status'; opts: StatusOption[] }) => (
     <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
@@ -51,12 +44,6 @@ export default function Overview({ offering, course, data }: TabProps) {
           <StatusRow label="Student feedback" field="feedback_status" opts={FEEDBACK_STATUS} />
           <StatusRow label="Course File / CAR" field="car_status" opts={CAR_STATUS} />
         </div>
-      </Card>
-      <Card className="lg:col-span-2">
-        <CardHeader title="Deadlines" subtitle="Term-wide dates set by the department; a course-specific date overrides them." />
-        <ul className="divide-y divide-line">{relevant.map(([k, label]) => (
-          <li key={k} className="flex items-center justify-between px-4 py-2.5 text-sm"><span>{label}</span><DueLabel date={milestone(data, k, offering.id)} /></li>))}
-        </ul>
       </Card>
     </div>
   );

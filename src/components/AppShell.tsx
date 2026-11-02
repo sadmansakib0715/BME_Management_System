@@ -1,18 +1,21 @@
 import { clsx } from 'clsx';
-import { BookOpen, CalendarDays, ClipboardList, Compass, FileUp, Gauge, Home, LogOut, Menu, Monitor, Moon, Settings2, Sun, Target, Unlock, Users, X } from 'lucide-react';
+import { Building2, ClipboardList, Compass, FileUp, LogOut, Menu, Monitor, Moon, Settings2, Sun, Unlock, UserRound, Users, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
+import { DEPT_PATHS } from './DeptLayout';
 import { useTerm } from '@/lib/TermContext';
 import { useTheme, type ThemePref } from '@/lib/theme';
 import { Select } from './ui';
 
 const DEPT = (import.meta.env.VITE_DEPT_NAME as string | undefined) ?? 'Department of BME, BUET';
 
-function Item({ to, icon, children, end }: { to: string; icon: ReactNode; children: ReactNode; end?: boolean }) {
+function Item({ to, icon, children, end, also }: { to: string; icon: ReactNode; children: ReactNode; end?: boolean; also?: string[] }) {
+  const { pathname } = useLocation();
+  const extra = also?.some((p) => pathname === p);
   return (
-    <NavLink to={to} end={end} className={({ isActive }) => clsx('flex items-center gap-2.5 h-9 px-2.5 rounded text-sm font-medium transition-colors duration-150 cursor-pointer',
-      isActive ? 'bg-brand text-brand-fg shadow-card' : 'text-muted hover:text-brand-ink hover:bg-brand-soft')}>
+    <NavLink to={to} end={end} aria-current={extra ? 'page' : undefined} className={({ isActive }) => clsx('flex items-center gap-2.5 h-9 px-2.5 rounded text-sm font-medium transition-colors duration-150 cursor-pointer',
+      isActive || extra ? 'bg-brand text-brand-fg shadow-card' : 'text-muted hover:text-brand-ink hover:bg-brand-soft')}>
       <span className="size-4 shrink-0" aria-hidden>{icon}</span>{children}
     </NavLink>
   );
@@ -60,21 +63,22 @@ function Sidebar() {
         </Select>
       </div>
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 space-y-0.5">
-        <Item to="/" end icon={<Home className="size-4" />}>My work</Item>
-        <Item to="/courses" icon={<BookOpen className="size-4" />}>Courses</Item>
-        <Item to="/calendar" icon={<CalendarDays className="size-4" />}>Calendar</Item>
-        <Item to="/outcomes" icon={<Target className="size-4" />}>Outcomes (OBE)</Item>
-        <Item to="/guide" icon={<Compass className="size-4" />}>How it works</Item>
+        <Item to="/" end icon={<UserRound className="size-4" />}>My courses</Item>
+        <Item to="/dashboard" also={DEPT_PATHS} icon={<Building2 className="size-4" />}>Department</Item>
         {isAdmin && <>
-          <div className="pt-4 pb-1 px-2.5 text-2xs font-semibold uppercase tracking-wider text-subtle">Department</div>
-          <Item to="/dashboard" icon={<Gauge className="size-4" />}>Overview</Item>
+          <div className="pt-4 pb-1 px-2.5 text-2xs font-semibold uppercase tracking-wider text-subtle">Administration</div>
           <Item to="/admin/assignments" icon={<ClipboardList className="size-4" />}>Assignments</Item>
           <Item to="/admin/term" icon={<Settings2 className="size-4" />}>Term setup</Item>
           <Item to="/admin/people" icon={<Users className="size-4" />}>People & access</Item>
           <Item to="/admin/import" icon={<FileUp className="size-4" />}>Import workbook</Item>
         </>}
       </nav>
-      <div className="px-3 pt-3 pb-2"><ThemeSwitch /></div>
+      <div className="px-3 pt-3 pb-2 space-y-2">
+        <Link to="/guide" className="flex items-center gap-2 px-2.5 h-8 rounded text-2xs font-medium text-muted hover:text-ink hover:bg-sunken transition-colors duration-150">
+          <Compass className="size-3.5" aria-hidden />How it works
+        </Link>
+        <ThemeSwitch />
+      </div>
       {openAccess ? (
         <div className="border-t border-line p-3 space-y-2">
           <div className="flex items-start gap-1.5 rounded border border-warn/30 bg-warn-soft px-2 py-1.5 text-2xs text-warn">

@@ -7,7 +7,8 @@ Version 1 covers **Phase 1 (workflow parity)** and **Phase 2 (OBE core)** of the
 
 | Area | What it does |
 | --- | --- |
-| My work | One task feed per person across exam steps, class tests, marks, gradesheets and course records, ordered by urgency, including "waiting on" whom |
+| My courses | Start page: each course you teach or examine with its progress and your part, plus your calendar of class tests and exams |
+| Department | Open to all faculty: overview, all courses, the shared calendar and program outcomes (workload and setup gaps for HOD/admins) |
 | Theory exam chain | QP A/B → Moderation 1/2 (with "needs correction" rounds per half) → Printing → Script examination A/B → Scrutiny → Gradesheet prep → Gradesheet scrutiny → HOD. Examiner and gradesheet roles are derived, never typed |
 | Sessional courses | A1/A2 tracked separately: assessment plans per sub-section, marks, and the sessional gradesheet chain |
 | Class tests | Dates, statuses, date history with reasons, and a hard block on two class tests for the same cohort on one day (admin override with reason) |

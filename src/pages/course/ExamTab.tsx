@@ -3,11 +3,9 @@ import { Check, Lock } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
-import { DueLabel } from '@/components/bits';
 import { Badge, Button, Callout, Card, CardHeader, Dialog, Empty, Field, Select, StatePill, Textarea, useToast } from '@/components/ui';
 import { rpc, useWrite } from '@/lib/api';
 import { fmtDateLong } from '@/lib/format';
-import { milestone, stepMilestone } from '@/lib/tasks';
 import { useTerm } from '@/lib/TermContext';
 import type { ExamStep } from '@/lib/types';
 import { blockers, EXAM_STEPS, labelOf, SG_PREP_STATUS, SG_SCRUTINY_STATUS, statusLabel, stepDef, stepOwner, stepState } from '@/lib/workflow';
@@ -55,7 +53,7 @@ function TheoryExam({ offering, data }: TabProps) {
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_340px] [&>*]:min-w-0">
       <Card>
-        <CardHeader title="Term-final chain" subtitle={`Question submission due ${fmtDateLong(milestone(data, 'question_submission', offering.id))}`} />
+        <CardHeader title="Term-final chain" subtitle="Each step opens when the one before it is complete." />
         <ol className="divide-y divide-line">
           {EXAM_STEPS.map((def, idx) => {
             const t = tasks.find((x) => x.step === def.key);
@@ -65,7 +63,6 @@ function TheoryExam({ offering, data }: TabProps) {
             const mine = canAct(def.key);
             const value = draft[def.key] ?? cur;
             const returned = cur === 'under_correction' || cur === 'needs_correction';
-            const due = t?.due_on ?? stepMilestone(data, def.key, offering.id);
             return (
               <li key={def.key} className={clsx('px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2', st === 'locked' && 'bg-sunken/40')}>
                 <span className={clsx('size-7 rounded-full grid place-items-center text-2xs font-semibold shrink-0 border',
@@ -78,7 +75,6 @@ function TheoryExam({ offering, data }: TabProps) {
                     {st === 'locked' && ` · waiting on ${blockers(tasks, def.key).map((k) => stepDef(k).short).join(', ')}`}</div>
                 </div>
                 <StatePill state={returned ? 'returned' : st}>{statusLabel(def.key, cur)}</StatePill>
-                {st !== 'done' && <DueLabel date={due} />}
                 {mine && st !== 'locked' && (
                   <div className="flex items-center gap-2 ml-auto">
                     <label htmlFor={`st-${def.key}`} className="sr-only">New status for {def.label}</label>
@@ -147,7 +143,7 @@ function SessionalGradesheet({ offering, data }: TabProps) {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
       <Card>
-        <CardHeader title="Sessional gradesheet" subtitle={`Due ${fmtDateLong(milestone(data, 'sessional_gradesheet', offering.id))}`} />
+        <CardHeader title="Sessional gradesheet" subtitle="Preparation, then scrutiny, then to the HOD." />
         {pending > 0 && <div className="px-4 pt-3"><Callout tone="info">{pending} assessment item{pending > 1 ? 's' : ''} across all sub-sections still need published marks before preparation can start.</Callout></div>}
         <div className="divide-y divide-line">
           <GradesheetPart offering={offering.id} part="prep" title="Preparation" who={g.preparer} status={g.prep_status} opts={SG_PREP_STATUS} enabled={pending === 0} />

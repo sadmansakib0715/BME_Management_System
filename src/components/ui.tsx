@@ -52,12 +52,12 @@ const toneCls: Record<Tone, string> = {
 export function Badge({ tone = 'neutral', children, icon, className }: { tone?: Tone; children: ReactNode; icon?: ReactNode; className?: string }) {
   return <span className={clsx('inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-2xs font-semibold whitespace-nowrap', toneCls[tone], className)}>{icon}{children}</span>;
 }
-export type StepTone = 'done' | 'active' | 'ready' | 'locked' | 'late' | 'returned';
+export type StepTone = 'done' | 'active' | 'ready' | 'locked' | 'returned';
 export function StatePill({ state, children }: { state: StepTone; children: ReactNode }) {
   const map: Record<StepTone, [Tone, ReactNode]> = {
     done: ['ok', <CheckCircle2 key="i" className="size-3" aria-hidden />], active: ['info', <Clock3 key="i" className="size-3" aria-hidden />],
     ready: ['brand', <CircleDashed key="i" className="size-3" aria-hidden />], locked: ['neutral', <Lock key="i" className="size-3" aria-hidden />],
-    late: ['bad', <AlertTriangle key="i" className="size-3" aria-hidden />], returned: ['warn', <AlertTriangle key="i" className="size-3" aria-hidden />],
+    returned: ['warn', <AlertTriangle key="i" className="size-3" aria-hidden />],
   };
   const [tone, icon] = map[state];
   return <Badge tone={tone} icon={icon}>{children}</Badge>;

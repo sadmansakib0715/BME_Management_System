@@ -3,8 +3,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
 import { TypeBadge } from '@/components/bits';
-import { Card, Empty, ErrorNote, Input, Meter, PageHeader, SegTabs, Spinner, StatePill } from '@/components/ui';
-import { courseHealth } from '@/lib/tasks';
+import { Card, Empty, ErrorNote, Input, Meter, PageHeader, SegTabs, Spinner } from '@/components/ui';
 import { useTerm } from '@/lib/TermContext';
 import { examProgress, labelOf, OUTLINE_STATUS } from '@/lib/workflow';
 
@@ -30,7 +29,7 @@ export default function Courses() {
 
   return (
     <>
-      <PageHeader eyebrow={data.term.name} title="Courses" description={`${data.offerings.length} courses this term.`} />
+      <PageHeader eyebrow={data.term.name} title="All courses" description={`${data.offerings.length} courses this term.`} />
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <SegTabs label="Filter courses" value={filter} onChange={setFilter}
           options={[{ value: 'all', label: 'All' }, { value: 'mine', label: 'Mine' }, { value: 'theory', label: 'Theory' }, { value: 'sessional', label: 'Sessional' }]} />
@@ -44,14 +43,13 @@ export default function Courses() {
         {rows.length === 0 ? <Empty title="No courses match">Try another filter or search term.</Empty> : (
           <div className="overflow-x-auto">
             <table className="table">
-              <thead><tr><th>Course</th><th>Type</th><th>Teachers</th><th>Outline</th><th className="min-w-44">Progress</th><th>Health</th></tr></thead>
+              <thead><tr><th>Course</th><th>Type</th><th>Teachers</th><th>Outline</th><th className="min-w-44">Progress</th></tr></thead>
               <tbody>
                 {rows.map(({ o, c }) => {
                   const hasExam = data.exam.some((x) => x.offering_id === o.id);
                   const p = examProgress(data.tasks.filter((t) => t.offering_id === o.id));
                   const items = data.items.filter((i) => i.offering_id === o.id && i.status !== 'cancelled');
                   const published = items.filter((i) => ['published', 'locked'].includes(i.marks_status)).length;
-                  const h = courseHealth(data, o);
                   const rec = data.records.find((r) => r.offering_id === o.id);
                   return (
                     <tr key={o.id}>
@@ -63,11 +61,6 @@ export default function Courses() {
                         {hasExam ? <><div className="text-2xs text-muted mb-1">Exam: {p.current ? p.current.short : 'Complete'} · {p.done}/{p.total}</div><Meter value={p.done} max={p.total} label={`${c.code} exam progress`} /></>
                           : items.length ? <><div className="text-2xs text-muted mb-1">Marks published {published}/{items.length}</div><Meter value={published} max={items.length} label={`${c.code} marks progress`} /></>
                           : <span className="text-2xs text-subtle">No assessments yet</span>}
-                      </td>
-                      <td title={h.reasons.join('\n') || 'On track'}>
-                        <StatePill state={h.health === 'on_track' ? 'done' : h.health === 'attention' ? 'returned' : 'late'}>
-                          {{ on_track: 'On track', attention: 'Attention', at_risk: 'At risk', blocked: 'Blocked' }[h.health]}
-                        </StatePill>
                       </td>
                     </tr>
                   );

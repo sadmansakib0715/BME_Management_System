@@ -46,7 +46,7 @@ const Paper = ({ x, y, w, h }: { x: number; y: number; w: number; h: number }) =
 const Line = ({ x, y, w, cls = 'fill-line-strong' }: { x: number; y: number; w: number; cls?: string }) => <rect x={x} y={y} width={w} height="4" rx="2" className={cls} />;
 
 export function IllTasks() {
-  const rows = [['fill-bad', 'fill-bad/25', 64], ['fill-warn', 'fill-warn/25', 50], ['fill-ok', 'fill-ok/25', 72]] as const;
+  const rows = [['fill-brand', 'fill-brand/15', 64], ['fill-wash', 'fill-wash/20', 50], ['fill-wash', 'fill-wash/20', 72]] as const;
   return (
     <Scene>
       <Paper x={40} y={18} w={160} h={104} />

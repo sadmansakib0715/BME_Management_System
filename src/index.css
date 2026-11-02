@@ -2,41 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tokens: ink wash. Charcoal ink on cream paper, mist-grey lines, slate-blue wash as the brand.
-   brand is a deepened #6D8196 so cream text on it passes AA; --wash is the exact swatch, for decoration only.
-   Status colours always come with text. Theme is chosen by data-theme on <html> (set in index.html + src/lib/theme.ts). */
+/* Tokens: charcoal ink on clean off-white, mist-grey lines, BUET maroon (#9B1313) as the brand, slate (#6D8196) as the calm secondary.
+   --wash (slate) is for data and decoration. Status colours always come with text.
+   Theme is chosen by data-theme on <html> (set in index.html + src/lib/theme.ts). */
 @layer base {
   :root {
-    --bg: 255 255 227; --surface: 255 255 247; --sunken: 246 246 218;
-    --line: 226 226 206; --line-strong: 203 203 203;
-    --ink: 74 74 74; --muted: 90 90 90; --subtle: 104 104 100;
-    --brand: 90 110 131; --brand-ink: 70 87 106; --brand-soft: 233 237 234; --brand-fg: 255 255 227;
-    --wash: 109 129 150; --mist: 203 203 203; --hero: 74 74 74; --hero-fg: 255 255 227;
-    --ok: 52 108 74; --ok-soft: 232 242 220; --ok-fg: 255 255 238;
-    --warn: 146 82 14; --warn-soft: 253 240 204;
-    --bad: 164 46 46; --bad-soft: 250 230 218; --bad-fg: 255 255 238;
-    --info: 72 88 140; --info-soft: 230 233 240;
-    --shade: 74 74 74;
+    --bg: 250 250 249; --surface: 255 255 255; --sunken: 244 244 243;
+    --line: 229 229 228; --line-strong: 203 203 203;
+    --ink: 58 58 58; --muted: 82 82 82; --subtle: 104 104 104;
+    --brand: 155 19 19; --brand-ink: 125 15 15; --brand-soft: 251 236 236; --brand-fg: 255 255 255;
+    --wash: 109 129 150; --mist: 203 203 203; --hero: 74 74 74; --hero-fg: 250 250 249;
+    --ok: 52 108 74; --ok-soft: 232 242 232; --ok-fg: 255 255 255;
+    --warn: 146 82 14; --warn-soft: 252 241 222;
+    --bad: 185 28 28; --bad-soft: 254 236 236; --bad-fg: 255 255 255;
+    --info: 72 88 140; --info-soft: 233 236 244;
+    --shade: 58 58 58;
     color-scheme: light;
   }
   :root[data-theme="dark"] {
-    --bg: 30 30 30; --surface: 42 42 42; --sunken: 54 54 54;
-    --line: 74 74 74; --line-strong: 98 98 98;
-    --ink: 255 255 227; --muted: 203 203 203; --subtle: 170 170 160;
-    --brand: 160 179 199; --brand-ink: 198 211 225; --brand-soft: 52 60 70; --brand-fg: 26 30 36;
-    --wash: 109 129 150; --mist: 203 203 203; --hero: 22 22 22; --hero-fg: 255 255 227;
+    --bg: 28 28 28; --surface: 40 40 40; --sunken: 52 52 52;
+    --line: 70 70 70; --line-strong: 96 96 96;
+    --ink: 244 244 243; --muted: 203 203 203; --subtle: 168 168 166;
+    --brand: 200 72 72; --brand-ink: 246 170 170; --brand-soft: 70 28 28; --brand-fg: 255 255 255;
+    --wash: 140 160 182; --mist: 203 203 203; --hero: 20 20 20; --hero-fg: 244 244 243;
     --ok: 142 200 152; --ok-soft: 34 52 38; --ok-fg: 18 36 22;
     --warn: 230 186 92; --warn-soft: 58 47 24;
-    --bad: 240 142 130; --bad-soft: 64 32 30; --bad-fg: 50 14 12;
+    --bad: 248 140 120; --bad-soft: 66 30 26; --bad-fg: 50 12 8;
     --info: 158 175 228; --info-soft: 38 43 62;
     --shade: 0 0 0;
     color-scheme: dark;
   }
   html { -webkit-text-size-adjust: 100%; }
   body { @apply bg-bg text-ink font-sans antialiased; font-feature-settings: 'cv11', 'ss01';
-         /* Ink-wash bleed: a faint slate wash and mist pooling behind the paper cards. */
-         background-image: radial-gradient(60rem 30rem at 100% -10%, rgb(var(--wash) / 0.12), transparent 60%),
-                           radial-gradient(50rem 30rem at -10% 110%, rgb(var(--mist) / 0.22), transparent 60%);
+         /* Ink-wash bleed: a faint slate wash and a trace of maroon pooling behind the cards. */
+         background-image: radial-gradient(60rem 30rem at 100% -10%, rgb(var(--wash) / 0.10), transparent 60%),
+                           radial-gradient(50rem 30rem at -10% 110%, rgb(var(--brand) / 0.05), transparent 60%);
          background-attachment: fixed; }
   :focus-visible { outline: 2px solid rgb(var(--brand)); outline-offset: 2px; border-radius: 4px; }
   ::selection { background: rgb(var(--brand) / 0.2); }

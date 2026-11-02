@@ -13,7 +13,7 @@ function readPref(): ThemePref {
 function apply(pref: ThemePref) {
   const dark = pref === 'dark' || (pref === 'system' && media().matches);
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#1e1e1e' : '#ffffe3');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#1c1c1c' : '#fafaf9');
 }
 
 export function useTheme() {

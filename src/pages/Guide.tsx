@@ -9,33 +9,33 @@ const FLOW: { icon: ReactNode; title: string; text: string; who: string }[] = [
   { icon: <FileSpreadsheet />, title: 'Load the term', text: 'Import the Activity Tracker workbook. Every fix is previewed before anything is saved.', who: 'Admin' },
   { icon: <UserCog />, title: 'Assign roles', text: 'Teachers, question setters, moderators and scrutinizers per course. Conflicts are blocked.', who: 'Admin' },
   { icon: <BookOpen />, title: 'Set up courses', text: 'Add students, write course outcomes and build the assessment plan.', who: 'Faculty' },
-  { icon: <ClipboardCheck />, title: 'Run the term', text: 'Class tests and exam steps unlock in order. Everyone sees their next task.', who: 'Everyone' },
+  { icon: <ClipboardCheck />, title: 'Run the term', text: 'Class tests and exam steps open in order. Each course card shows where it stands.', who: 'Everyone' },
   { icon: <GraduationCap />, title: 'Enter marks', text: 'Paste from Excel, verify, publish and lock. Every change is logged.', who: 'Faculty' },
   { icon: <Target />, title: 'Measure outcomes', text: 'CO and PO attainment is computed from published marks, ready for the CAR.', who: 'Automatic' },
 ];
 
 const FEATURES: { art: ReactNode; title: string; text: string; to: string; admin?: boolean }[] = [
-  { art: <IllTasks />, title: 'My work', text: 'One task list per person, ordered by urgency, showing who you are waiting on.', to: '/' },
+  { art: <IllTasks />, title: 'My courses', text: 'Your start page: each course you teach or examine, how it is going, and your calendar of class tests and exams.', to: '/' },
   { art: <IllExamChain />, title: 'Theory exam chain', text: 'Question papers → moderation → printing → scripts → scrutiny → gradesheet → HOD, with correction rounds.', to: '/courses' },
-  { art: <IllCalendar />, title: 'Class tests & calendar', text: 'Dates with history, and a hard stop on two class tests for one cohort on the same day.', to: '/calendar' },
+  { art: <IllCalendar />, title: 'Class tests & calendar', text: 'Every class test and exam in one calendar, and a guard against two class tests for one cohort on the same day.', to: '/calendar' },
   { art: <IllPlan />, title: 'Assessment plans', text: 'Components, weights and best-N per course or sessional sub-section; items are generated for you.', to: '/courses' },
   { art: <IllMarks />, title: 'Marks', text: 'A grid per item with checks against question maxima: Entering → Verified → Published → Locked.', to: '/courses' },
   { art: <IllOutcomes />, title: 'Outcomes (OBE)', text: 'CO–PO mapping by strength, attainment against the term thresholds, and program-level coverage.', to: '/outcomes' },
-  { art: <IllDepartment />, title: 'Department overview', text: 'For the HOD: exam funnel, course health, workload and setup gaps at a glance.', to: '/dashboard', admin: true },
+  { art: <IllDepartment />, title: 'Department overview', text: 'Term-final progress and published marks across every course. The HOD also sees workload and setup gaps.', to: '/dashboard' },
   { art: <IllImport />, title: 'Workbook import', text: 'Reads the existing spreadsheet in the browser, cleans names and dates, and flags what needs review.', to: '/admin/import', admin: true },
 ];
 
 const ROLES: { icon: ReactNode; title: string; points: string[] }[] = [
-  { icon: <Users />, title: 'Faculty', points: ['See your tasks on My work', 'Manage rosters, COs and assessment plans', 'Enter and publish marks'] },
+  { icon: <Users />, title: 'Faculty', points: ['See your courses and calendar at a glance', 'Manage rosters, COs and assessment plans', 'Enter and publish marks'] },
   { icon: <ClipboardCheck />, title: 'Exam roles', points: ['Prepare, moderate or scrutinize papers', 'Return a paper for correction', 'Steps unlock only when the previous one is done'] },
-  { icon: <LineChart />, title: 'HOD & admins', points: ['Set up terms and thresholds', 'Assign roles and manage access', 'Track the whole department'] },
+  { icon: <LineChart />, title: 'HOD & admins', points: ['Set up terms and thresholds', 'Assign roles and manage access', 'See workload across the department'] },
 ];
 
 const SAFEGUARDS: { icon: ReactNode; title: string; text: string }[] = [
   { icon: <ShieldCheck />, title: 'Rules live in the database', text: 'Order of steps, who owns them and clash checks hold even outside the app.' },
   { icon: <Lock />, title: 'Marks stay private', text: 'Only a course’s teachers, its exam-role holders and admins can see student marks.' },
   { icon: <History />, title: 'Everything is audited', text: 'Changes to assignments, tasks, marks and access are logged with before and after values.' },
-  { icon: <BellRing />, title: 'Reminders by email', text: 'When a step unlocks, a paper comes back, or a deadline is 7, 3 or 1 days away and on the day.' },
+  { icon: <BellRing />, title: 'Email when it is your turn', text: 'A short note when your exam step opens or a paper comes back for correction.' },
 ];
 
 const Icon = ({ children }: { children: ReactNode }) => (

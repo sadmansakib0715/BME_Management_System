@@ -8,8 +8,6 @@ import { fmtDateLong, todayISO } from '@/lib/format';
 import { useTerm } from '@/lib/TermContext';
 
 interface Ev { date: string; label: string; sub: string; href: string; kind: 'ct' | 'assess' | 'deadline' }
-const MILESTONE_LABEL: Record<string, string> = { outline_sharing: 'Outlines shared', question_submission: 'Question submission', exam_start: 'Term finals begin',
-  theory_gradesheet: 'Theory gradesheets due', sessional_gradesheet: 'Sessional gradesheets due', feedback_deadline: 'Feedback deadline', car_deadline: 'CAR deadline' };
 
 export default function Calendar() {
   const { me } = useAuth();
@@ -29,7 +27,7 @@ export default function Calendar() {
       const isCt = data.components.find((c) => c.id === i.component_id)?.kind === 'class_test';
       out.push({ date: i.held_on, label: `${courseOf(o)?.code} ${i.title}`, sub: [o.batch, i.held_time].filter(Boolean).join(' · '), href: `/courses/${o.id}/assessments`, kind: isCt ? 'ct' : 'assess' });
     }
-    for (const m of data.milestones.filter((x) => !x.offering_id)) out.push({ date: m.due_on, label: MILESTONE_LABEL[m.kind] ?? m.kind, sub: 'Department deadline', href: '/', kind: 'deadline' });
+    for (const m of data.milestones.filter((x) => !x.offering_id && x.kind === 'exam_start')) out.push({ date: m.due_on, label: 'Term final exams begin', sub: 'Department', href: '/calendar', kind: 'deadline' });
     return out.sort((a, b) => a.date.localeCompare(b.date) || a.label.localeCompare(b.label));
   }, [data, scope, cohort, me, courseOf, teachersOf]);
 
@@ -49,11 +47,11 @@ export default function Calendar() {
   const shift = (n: number) => { const d = new Date(Date.UTC(y, m - 1 + n, 1)); setMonth(d.toISOString().slice(0, 7)); };
   const today = todayISO();
   const inMonth = events.filter((e) => e.date.startsWith(month));
-  const dot = { ct: 'bg-brand', assess: 'bg-info', deadline: 'bg-warn' };
+  const dot = { ct: 'bg-brand', assess: 'bg-wash', deadline: 'bg-info' };
 
   return (
     <>
-      <PageHeader eyebrow={data.term.name} title="Calendar" description="Class tests, sessional assessments and department deadlines. Weeks start on Saturday." />
+      <PageHeader eyebrow={data.term.name} title="Calendar" description="Class tests, sessional assessments and term finals across the department. Weeks start on Saturday." />
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="flex items-center gap-1">
           <Button size="sm" variant="ghost" aria-label="Previous month" onClick={() => shift(-1)}><ChevronLeft className="size-4" aria-hidden /></Button>
@@ -67,7 +65,7 @@ export default function Calendar() {
         <div className="flex items-center gap-3 text-2xs text-muted ml-auto">
           <span className="flex items-center gap-1"><span className={`size-2 rounded-full ${dot.ct}`} />Class test</span>
           <span className="flex items-center gap-1"><span className={`size-2 rounded-full ${dot.assess}`} />Sessional</span>
-          <span className="flex items-center gap-1"><span className={`size-2 rounded-full ${dot.deadline}`} />Deadline</span>
+          <span className="flex items-center gap-1"><span className={`size-2 rounded-full ${dot.deadline}`} />Term finals</span>
         </div>
       </div>
       <Card className="hidden md:block overflow-hidden">
