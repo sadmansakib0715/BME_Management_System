@@ -37,6 +37,14 @@ export type CqiStatus = 'proposed' | 'approved' | 'implemented' | 'verified';
 export interface CqiItem { id: string; loop: 'CO' | 'PO' | 'PEO'; source: 'CAR' | 'attainment' | 'survey' | 'IAP' | 'other'; offering_id: string | null; course_code: string | null;
   finding: string; action: string | null; owner: string | null; resolution_id: string | null; effective_term: string | null; status: CqiStatus; created_at: string; }
 export interface ProgramPo { batch: string; po_code: string; value: number; courses: number; course_codes: string[]; }
+// ---------------------------------------------------------------- OBE master data (0013): outline & documents, assessment map with rubrics
+export interface Instructor { name: string; room?: string; email?: string }
+export interface ObeDocs { offering_id: string; contents: string | null; objectives: string | null; outline_text: string | null; instructors: Instructor[];
+  marks_distribution: { component: string; percent: number }[]; components: { component: string; weight: number; marks: number }[];
+  source: { folder?: string; files?: Record<string, string>; car_text?: string | null }; issues: string[]; copied_from: string | null; updated_at: string; }
+/** One question part or marking criterion of the assessment map, tagged to COs through obe_criterion_cos. */
+export interface ObeCriterion { id: string; offering_id: string; assessment: string; label: string; max_marks: number; sort: number; }
+export interface CriterionCo { criterion_id: string; co_id: string; }
 export interface CoPo { co_id: string; po_code: string; strength: 1 | 2 | 3; }
 
 export type ComponentKind = 'attendance' | 'class_test' | 'term_final' | 'lab_report' | 'lab_test' | 'quiz' | 'viva' | 'presentation' | 'demonstration' | 'project' | 'assignment' | 'other';
@@ -45,3 +53,8 @@ export type ItemStatus = 'planned' | 'scheduled' | 'held' | 'postponed' | 'cance
 export type MarksStatus = 'none' | 'entering' | 'verified' | 'published' | 'locked';
 export interface AssessmentItem { id: string; component_id: string; offering_id: string; section_id: string | null; seq: number; title: string; held_on: string | null; held_time: string | null; total_marks: number; status: ItemStatus; marks_status: MarksStatus; responsible: string | null; syllabus: string | null; date_later?: boolean; }
 export interface ItemDateHistory { id: string; item_id: string; old_date: string | null; new_date: string | null; reason: string | null; changed_by: string | null; changed_at: string; }
+
+// Rubrics (0014, teacher-made): criteria with marks and bands, each criterion linked to COs by CO id.
+export interface RubricLevel { label: string; min: number | null; max: number | null; text: string }
+export interface RubricCriterion { id: string; name: string; max: number; levels: RubricLevel[]; cos: string[] }
+export interface Rubric { id: string; offering_id: string; component_id: string | null; title: string; levels: string[]; criteria: RubricCriterion[]; note: string; sort: number; updated_at: string }

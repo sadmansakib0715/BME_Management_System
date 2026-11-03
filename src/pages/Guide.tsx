@@ -11,7 +11,7 @@ const FLOW: { icon: ReactNode; title: string; text: string; who: string }[] = [
   { icon: <BookOpen />, title: 'Plan each course', text: 'Write the course outcomes, map them to the POs, and set the assessment plan.', who: 'Faculty' },
   { icon: <CalendarDays />, title: 'Fix the routine', text: 'Set class-test dates, or mark one “to be set later” and it glows red until it is set. One cohort never gets two class tests on the same day.', who: 'Admin or faculty' },
   { icon: <ClipboardCheck />, title: 'Hold assessments, run the exam', text: 'Class tests and lab work first, then the term final from question papers to the HOD, or the sessional gradesheet. Each step opens when the one before it is done.', who: 'Everyone' },
-  { icon: <GraduationCap />, title: 'Close out with OBE', text: 'Enter the CO and PO attainment from the course workbook, write the CAR, and complete the course file.', who: 'Faculty, then OBE Cell' },
+  { icon: <GraduationCap />, title: 'Close out with OBE', text: 'Your COs, mapping, assessment map and outline arrive from the last offering: revise them and mark them reviewed. Drag each CO onto its POs, tag each question to its COs, write rubrics for presentations and projects, enter the attainment from the workbook, write the CAR and complete the course file.', who: 'Faculty, then OBE Cell' },
 ];
 
 const FEATURES: { art: ReactNode; title: string; text: string; to: string; admin?: boolean }[] = [
@@ -20,13 +20,13 @@ const FEATURES: { art: ReactNode; title: string; text: string; to: string; admin
   { art: <IllExamChain />, title: 'Theory exam chain', text: 'Question papers → moderation → printing → scripts → scrutiny → gradesheet → HOD, with correction rounds.', to: '/courses' },
   { art: <IllCalendar />, title: 'Class tests & calendar', text: 'Every class test and exam in one calendar, and a guard against two class tests for one cohort on the same day.', to: '/calendar' },
   { art: <IllPlan />, title: 'Assessment plans', text: 'Components and how many of each. Theory sections A1 and A2 share one plan; lab sub-sections are tracked separately. Each item shows whether it is held and whether its marks are under evaluation or published.', to: '/courses' },
-  { art: <IllOutcomes />, title: 'OBE', text: 'COs mapped to POs and K/P/A, imported CO and PO attainment against the 40% threshold, the CAR with review, the course file, program PO per batch, BUGS resolutions and the CQI log.', to: '/outcomes' },
+  { art: <IllOutcomes />, title: 'OBE', text: 'COs mapped to POs and K/P/A, the assessment map with your own rubric criteria, imported CO and PO attainment against the 40% threshold, the CAR with review, the course file, program PO per batch, BUGS resolutions and the CQI log.', to: '/outcomes' },
   { art: <IllDepartment />, title: 'Department overview', text: 'Assessments held and term-final progress across every course, and the department progress tree grouped by level and term. The HOD also sees workload and setup gaps.', to: '/dashboard' },
   { art: <IllImport />, title: 'Term setup', text: 'Import the whole term from the Activity Tracker workbook, with every correction shown first, or set dates, courses, teachers, exam roles and the class-test routine by hand.', to: '/admin/term', admin: true },
 ];
 
 const ROLES: { icon: ReactNode; title: string; points: string[] }[] = [
-  { icon: <Users />, title: 'Faculty', points: ['See your courses, calendar and progress tree at a glance', 'Write course outcomes and assessment plans', 'Set class-test dates, or leave them for later', 'Enter attainment and write the CAR'] },
+  { icon: <Users />, title: 'Faculty', points: ['See your courses, calendar and progress tree at a glance', 'Write course outcomes, assessment plans and rubric criteria', 'Set class-test dates, or leave them for later', 'Enter attainment and write the CAR'] },
   { icon: <ClipboardCheck />, title: 'Exam roles', points: ['Prepare, moderate or scrutinize papers', 'Return a paper for correction', 'Steps open only when the previous one is done'] },
   { icon: <LineChart />, title: 'HOD & admins', points: ['Set up the term by import or by hand', 'Assign roles and manage access', 'Review and finalise CARs, record BUGS resolutions', 'See the whole department in one tree'] },
 ];

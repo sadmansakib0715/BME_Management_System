@@ -15,6 +15,10 @@ under evaluation or published (a status only), and course outcomes (OBE).
 | Assessment plan | Components (CT, term final, lab report, viva…), counts and weights; items are generated automatically |
 | Course outcomes | COs with Bloom domain/level, CO–PO mapping (strength 1–3) against the department's PO1–PO12 |
 | OBE (course) | Per offering: COs with taxonomy levels, delivery and tools; CO–PO and K/P/A mapping (binary, as CO-PO Mapping.docx); imported cohort CO% / PO% with Y/N at ≥ 40% and NA for unmapped POs; course-file checklist; CAR (parts A–B from data, C–E written, Draft → Submitted → Reviewed → Final) |
+| OBE master data | Every course in the department OBE folder (49 offerings, Jul 2022 – Jul 2025): COs, CO–PO and K/P/A mapping, the assessment map (409 question parts and rubric criteria tagged to COs), cohort attainment, outlines, past CARs (parts C–E) and BUGS resolutions. A new offering starts from the last one (COs, mapping, assessment map, outline) for the teachers to review |
+| Assessment map | Per offering: each exam question part or marking criterion with its marks and CO tags (table, or drag-to-connect), marks per CO and the outline's marks distribution; printable |
+| Rubrics | Teacher-made rubrics for presentations, demos, projects and reports: criteria × levels with mark bands, pasted from Excel/Sheets or started from the sample, each criterion connected to COs by drag-and-drop |
+| CO–PO mapping | Drag a CO onto a PO to link it (Connect view) or tick a table; BAETE-expected POs are tagged for culminating courses |
 | OBE (program) | Course dashboard, program PO per batch from BME 300/350/400, CO–PO coverage, BUGS resolutions, CQI log (CO / PO / PEO loops), PEOs, POs, K/P/A |
 | Term setup | Two ways: import the workbook, or set up by hand (term & dates, courses & sections, teachers & roles, class-test routine) |
 
@@ -39,7 +43,10 @@ tests/          unit tests (workflow, attainment, importer, dates)
 
 ### 1. Supabase project
 1. Create a project at supabase.com (free tier is enough to start).
-2. In **SQL Editor**, paste and run `supabase/setup.sql` (all migrations plus reference data in one file).
+2. In **SQL Editor**, paste and run `supabase/setup.sql` (all migrations plus reference data in one file),
+   then `supabase/seed_obe_master.sql` (the department's OBE data).
+   An **existing** project only needs `supabase/update_obe_master.sql` (migration 0013 plus the OBE data, safe to run again).
+   Both data files are generated from the OBE master copy: `python3 -I scripts/build_obe_seed.py path/to/obe_master.json`.
    (Or with the CLI: `supabase link`, `supabase db push`, then run `seed.sql`.)
 3. **Authentication → Providers → Email:** enable. **Authentication → URL configuration:** set the Site URL to where the app is hosted.
 4. Add yourself as the first HOD (replace the values) in the SQL Editor:

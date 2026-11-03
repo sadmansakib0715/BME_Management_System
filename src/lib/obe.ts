@@ -1,6 +1,6 @@
 // OBE rules from the department's OBE module specification (sections 2, 5, 7–9), without student marks:
 // cohort CO% and PO% are imported per offering; this module decides Y/N, NA, warnings and completeness.
-import type { CarReport, CoPo, Course, CourseFileItem, CourseOutcome, FileSlot, ObeAttainment, PO } from './types';
+import type { CarReport, CoPo, Course, CourseFileItem, CourseOutcome, CriterionCo, FileSlot, ObeAttainment, ObeCriterion, PO } from './types';
 
 export const DOMAIN_LEVELS: { domain: string; codes: string[] }[] = [
   { domain: 'Cognitive', codes: ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'] },
@@ -17,8 +17,15 @@ export const KPA: { group: string; items: [string, string][] }[] = [
   { group: 'Complex activity', items: [['A1', 'Diverse resources'], ['A2', 'Significant interactions'], ['A3', 'Innovation'], ['A4', 'Consequences for society and environment'], ['A5', 'Beyond previous experience']] },
 ];
 
-export const DELIVERY = ['Lectures', 'Tutorials', 'Homework', 'Lab sessions', 'Audio-visual demonstration', 'Weekly meetings', 'Hospital visits', 'Project work'];
-export const TOOLS = ['Written exams', 'Class tests', 'Lab reports', 'Lab test', 'Quiz', 'Viva', 'Presentations', 'Demonstration', 'Reports', 'Peer review'];
+/** Delivery methods and assessment tools as the department's CO-PO Mapping documents word them. */
+export const DELIVERY = ['Lectures', 'Homework', 'Tutorials', 'Discussion', 'Interactive discussions', 'Case Study', 'Guided Instruction', 'Guided Discussion and Practice',
+  'Demonstrations', 'Audio-visual demonstration', 'Coding Tasks', 'Simulation', 'Lab sessions', 'Hands-on Group Activities', 'Report writing', 'Term Project',
+  'Weekly meetings', 'Hospital visits', 'Clinical Observation'];
+export const TOOLS = ['Written exams', 'Class tests', 'Continuous Assessment', 'Assignments', 'Lab Test', 'Lab Quiz', 'Lab Report', 'Lab Viva', 'Final Quiz', 'Final Viva',
+  'Presentations', 'Demonstration', 'Reports', 'Final Report', 'Intermediate Submission', 'Peer Review'];
+/** Assessments offered when a teacher adds a group to the assessment map; any other name can be typed. */
+export const ASSESSMENTS = ['Term Final', 'Class Test', 'Continuous Assessment', 'Assignment', 'Lab Test', 'Lab Quiz', 'Lab Report', 'Viva', 'Presentation 01', 'Presentation 02',
+  'Demo 01', 'Demo 02', 'Project', 'Final Report', 'Oral Examination', 'Intermediate Submissions'];
 
 /** BAETE PO coverage expected of each culminating course (spec section 5). */
 export const CULMINATING_POS: Record<string, number[]> = {
@@ -115,4 +122,37 @@ export function courseFile(a: { cos: Pick<CourseOutcome, 'id'>[]; coPo: CoPo[]; 
     { slot: 'car', label: 'Course Assessment Report (final)', done: a.car?.status === 'final', auto: true },
     { slot: 'bsfs_feedback', label: 'BSFS feedback report', done: !!f('bsfs_feedback')?.done, auto: false, link: f('bsfs_feedback')?.link },
   ];
+}
+
+// ---------------------------------------------------------------- assessment map (question parts and marking criteria → COs)
+/** Criteria grouped by assessment, in the order they were first entered. */
+export function byAssessment<T extends Pick<ObeCriterion, 'assessment' | 'sort'>>(criteria: T[]): { assessment: string; items: T[] }[] {
+  const groups: { assessment: string; items: T[] }[] = [];
+  for (const c of [...criteria].sort((a, b) => a.sort - b.sort)) {
+    const g = groups.find((x) => x.assessment === c.assessment);
+    if (g) g.items.push(c); else groups.push({ assessment: c.assessment, items: [c] });
+  }
+  return groups;
+}
+
+/** Marks that assess each CO (a criterion tagged to several COs counts in full for each) and its share of the course total. */
+export function coCoverage(cos: Pick<CourseOutcome, 'id'>[], criteria: Pick<ObeCriterion, 'id' | 'max_marks'>[], links: CriterionCo[]) {
+  const total = criteria.reduce((n, c) => n + Number(c.max_marks), 0);
+  return cos.map((co) => {
+    const mine = criteria.filter((c) => links.some((l) => l.criterion_id === c.id && l.co_id === co.id));
+    const marks = mine.reduce((n, c) => n + Number(c.max_marks), 0);
+    return { co_id: co.id, marks, items: mine.length, share: total ? (marks / total) * 100 : 0 };
+  });
+}
+
+/** Checks for the assessment map: every CO assessed and every question or criterion tagged to a CO. */
+export function criteriaWarnings(cos: Pick<CourseOutcome, 'id'>[], criteria: Pick<ObeCriterion, 'id' | 'assessment' | 'label' | 'max_marks'>[], links: CriterionCo[]): string[] {
+  const w: string[] = [];
+  if (!criteria.length) return w;
+  coCoverage(cos, criteria, links).forEach((c, i) => { if (!c.items) w.push(`CO${i + 1} is not assessed by any question or criterion.`); });
+  for (const c of criteria) {
+    const name = `${c.assessment} · ${c.label}`;
+    if (!links.some((l) => l.criterion_id === c.id)) w.push(`${name} is not tagged to a CO.`);
+  }
+  return w;
 }

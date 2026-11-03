@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { humanError, supabase } from './supabase';
 import type {
-  AssessmentComponent, AssessmentItem, BugsResolution, CarReport, CoPo, Course, CourseFileItem, CourseOutcome, CourseRecord, CqiItem, ExamAssignment, ObeAttainment, ProgramPo,
+  AssessmentComponent, AssessmentItem, BugsResolution, CarReport, CoPo, Course, CourseFileItem, CourseOutcome, CourseRecord, CqiItem, CriterionCo, ExamAssignment, ObeAttainment, ObeCriterion, ObeDocs, ProgramPo, Rubric,
   ExamTask, Faculty, ItemDateHistory, Milestone, ModerationRound, Offering, PEO, PO, Section, SectionTeacher,
   SessionalGradesheet, Term, AllowedUser,
 } from './types';
@@ -60,7 +60,8 @@ export function useTermData(termId: string | undefined) {
 
 // ---------------------------------------------------------------- OBE per offering (COs, mapping, imported attainment, CAR, course file)
 export interface PrevOffering { id: string; termName: string; cos: CourseOutcome[]; coPo: CoPo[]; attainment: ObeAttainment[]; car: CarReport | null }
-export interface CourseObe { cos: CourseOutcome[]; coPo: CoPo[]; attainment: ObeAttainment[]; car: CarReport | null; files: CourseFileItem[]; prev: PrevOffering | null }
+export interface CourseObe { cos: CourseOutcome[]; coPo: CoPo[]; attainment: ObeAttainment[]; car: CarReport | null; files: CourseFileItem[]; prev: PrevOffering | null;
+  docs: ObeDocs | null; criteria: ObeCriterion[]; criterionCos: CriterionCo[]; rubrics: Rubric[] }
 
 /** The same course's most recent earlier offering: CAR Part B compares with it and Part D carries its Part E forward. */
 async function previousOffering(offering: Offering, term: Term): Promise<PrevOffering | null> {
@@ -84,14 +85,18 @@ export function useCourseObe(offering: Offering | undefined, term: Term | undefi
     queryFn: async (): Promise<CourseObe> => {
       const id = offering!.id;
       const cos = await rows<CourseOutcome>(supabase.from('course_outcomes').select('*').eq('offering_id', id).order('sort'));
-      const [coPo, attainment, car, files, prev] = await Promise.all([
+      const [coPo, attainment, car, files, prev, docs, criteria, rubrics] = await Promise.all([
         rowsIn<CoPo>('co_po_map', 'co_id', cos.map((c) => c.id)),
         rows<ObeAttainment>(supabase.from('obe_attainment').select('*').eq('offering_id', id)),
         rows<CarReport>(supabase.from('car_reports').select('*').eq('offering_id', id)),
         rows<CourseFileItem>(supabase.from('course_file_items').select('*').eq('offering_id', id)),
         previousOffering(offering!, term!),
+        rows<ObeDocs>(supabase.from('obe_offering_docs').select('*').eq('offering_id', id)),
+        rows<ObeCriterion>(supabase.from('obe_criteria').select('*').eq('offering_id', id).order('sort')),
+        rows<Rubric>(supabase.from('rubrics').select('*').eq('offering_id', id).order('sort')),
       ]);
-      return { cos, coPo, attainment, car: car[0] ?? null, files, prev };
+      const criterionCos = await rowsIn<CriterionCo>('obe_criterion_cos', 'criterion_id', criteria.map((c) => c.id));
+      return { cos, coPo, attainment, car: car[0] ?? null, files, prev, docs: docs[0] ?? null, criteria, criterionCos, rubrics };
     },
   });
 }
@@ -147,5 +152,7 @@ export const rpc = {
   generateItems: (component: string) => must(supabase.rpc('generate_items', { p_component: component })),
   reschedule: (a: { item: string; date: string | null; reason?: string; force?: boolean }) =>
     must(supabase.rpc('reschedule_item', { p_item: a.item, p_date: a.date, p_reason: a.reason ?? null, p_force: a.force ?? false })) as Promise<{ ok: boolean; conflicts: { course: string; title: string }[] }>,
+  /** Fills this offering's empty COs + mapping, assessment map and outline from the newest earlier offering. */
+  copyForward: (offering: string) => must(supabase.rpc('obe_copy_forward', { p_offering: offering })) as Promise<{ from: string | null; cos?: number; criteria?: number; rubrics?: number; outline?: boolean }>,
   importPlan: (plan: unknown) => must(supabase.rpc('import_term_plan', { p: plan })) as Promise<{ offerings: number; items: number; term_id: string }>,
 };
