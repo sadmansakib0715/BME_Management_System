@@ -1,7 +1,7 @@
 -- =====================================================================================
 -- BME Workflow · one-shot database setup for a NEW, EMPTY Supabase project
 -- Paste this whole file into Supabase → SQL Editor → New query → Run. Run it once.
--- Contains supabase/migrations/0001…0011 in order, then supabase/seed.sql
+-- Contains supabase/migrations/0001…0012 in order, then supabase/seed.sql
 -- (PO1–PO12, PEO1–PEO4, BME course catalog). No people or student data.
 --
 -- OPEN ACCESS IS ON after this script: no sign-in, every visitor can view and edit everything.
@@ -1504,6 +1504,23 @@ drop trigger if exists audit on public.car_reports;
 create trigger audit after insert or update or delete on public.car_reports for each row execute function public.tg_audit('offering_id');
 drop trigger if exists audit on public.co_po_map;
 create trigger audit after insert or update or delete on public.co_po_map for each row execute function public.tg_audit('co_id');
+
+-- ===== supabase/migrations/0012_date_later.sql =====
+-- BME Workflow · 0012 "To be set later" for assessment dates.
+-- A teacher can mark an item's date as deliberately left for later; the app shows it glowing dark red until a date is set.
+alter table public.assessment_items add column if not exists date_later boolean not null default false;
+
+-- Setting a date clears the reminder, whichever page set it.
+create or replace function public.tg_item_date_later() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if new.held_on is not null then new.date_later := false; end if;
+  return new;
+end $$;
+drop trigger if exists item_date_later on public.assessment_items;
+create trigger item_date_later before insert or update of held_on, date_later on public.assessment_items
+  for each row execute function public.tg_item_date_later();
+
 
 -- ===== supabase/seed.sql =====
 -- BME Workflow seed: public reference data only (no people, no rosters).

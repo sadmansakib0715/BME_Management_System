@@ -31,8 +31,11 @@ export default function Overview({ offering, course, data }: TabProps) {
           <dt className="text-muted">Credits</dt><dd className="tabular">{course.credits ?? '—'}</dd>
           <dt className="text-muted">Contact hours</dt><dd className="tabular">{course.contact_hours ?? '—'} per week</dd>
           <dt className="text-muted">Level-term</dt><dd>{course.level ? `Level ${course.level}${course.term_no ? `, Term ${course.term_no}` : ''}` : '—'}{course.elective_group && ` · Elective group ${course.elective_group}`}</dd>
-          {sections.map((s) => [<dt key={s.id + 'l'} className="text-muted">Section {s.name}</dt>,
-            <dd key={s.id}>{teachersOf(offering.id, s.id).map(nameOf).join(', ') || 'No teachers'}</dd>])}
+          {/* Theory: A1 and A2 are one class, so one list of teachers. Sessional: each sub-section has its own. */}
+          {course.course_type === 'theory' || sections.length < 2
+            ? [<dt key="tl" className="text-muted">Teachers</dt>, <dd key="t">{teachersOf(offering.id).map(nameOf).join(', ') || 'No teachers'}</dd>]
+            : sections.map((s) => [<dt key={s.id + 'l'} className="text-muted">Sub-section {s.name}</dt>,
+              <dd key={s.id}>{teachersOf(offering.id, s.id).map(nameOf).join(', ') || 'No teachers'}</dd>])}
         </dl>
       </Card>
       <Card>

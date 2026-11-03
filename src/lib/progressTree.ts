@@ -35,7 +35,7 @@ export interface PNode {
   toLabel?: string;         // name of that page, for the dropdown link
   edits?: EditGroup[];      // statuses you can set from the tree; none means the step follows other data
   waitingOn?: string;       // what has to finish first, when locked
-  dated?: { itemId: string; date: string | null };   // an assessment whose date can be set from the tree
+  dated?: { itemId: string; date: string | null; later?: boolean };   // an assessment whose date can be set from the tree; later = "to be set later"
   children?: PNode[];
 }
 
@@ -143,20 +143,29 @@ export function courseNode(offering: Offering, course: Course, data: TermData, o
     : i.status === 'held' || marksUnderEvaluation(i.marks_status) ? 'active' : 'ready';
   const itemHint = (i: Item) =>
     marksPublished(i.marks_status) ? 'Marks published' : i.status === 'held' ? 'Held, marks pending'
-    : i.held_on ? `On ${fmtDate(i.held_on, { weekday: 'short', day: 'numeric', month: 'short' })}` : i.status === 'cancelled' ? 'Cancelled' : 'Not scheduled';
-  const leaf = (i: Item, name = i.title): PNode => ({ id: i.id, label: secName(i.section_id) ? `${name} · ${secName(i.section_id)}` : name, state: itemState(i), hint: itemHint(i), ...page.assess,
-    dated: { itemId: i.id, date: i.held_on },
+    : i.held_on ? `On ${fmtDate(i.held_on, { weekday: 'short', day: 'numeric', month: 'short' })}` : i.date_later && i.status !== 'cancelled' ? 'Date to be set later' : i.status === 'cancelled' ? 'Cancelled' : 'Not scheduled';
+  // Items sit under their sub-section's branch, so the "(A1)" that generate_items adds to titles is dropped.
+  const plain = (i: Item, name: string) => { const s = secName(i.section_id); return s && name.endsWith(` (${s})`) ? name.slice(0, -s.length - 3) : name; };
+  const leaf = (i: Item, name = i.title): PNode => ({ id: i.id, label: plain(i, name), state: itemState(i), hint: itemHint(i), ...page.assess,
+    dated: { itemId: i.id, date: i.held_on, later: !!i.date_later && !i.held_on && i.status !== 'cancelled' },
     edits: [
       // Postponing needs a new date, so it is done from the assessments page.
       { label: 'Held', target: { offering: id, kind: 'item', itemId: i.id, field: 'status' }, value: i.status, options: ITEM_STATUS, elsewhere: ['postponed'] },
       { label: 'Marks', target: { offering: id, kind: 'item', itemId: i.id, field: 'marks_status' }, value: marksPublished(i.marks_status) ? 'published' : marksUnderEvaluation(i.marks_status) ? 'entering' : 'none', options: MARKS_STATE },
     ] });
+  const compNode = (c: typeof comps[number], its: Item[], key = ''): PNode => {
+    its = [...its].sort((a, b) => a.seq - b.seq);
+    return its.length === 1 ? { ...leaf(its[0], c.name), id: c.id + key }
+      : { id: c.id + key, label: c.name, children: its.length ? its.map((i) => leaf(i)) : [{ id: c.id + key + '-none', label: 'No items yet', state: 'ready' as const, ...page.assess }] };
+  };
+  // Theory: A1 and A2 sit the same class tests, so the course is one class. Sessional: each sub-section is its own lab group, with its own branch.
+  const subs = isTheory ? [] : data.sections.filter((s) => s.offering_id === id).sort((a, b) => a.name.localeCompare(b.name));
+  const split = subs.length > 1 && comps.some((c) => c.per_section);
   const assessments: PNode = { id: 'assess', label: 'Assessments', tone: 'assess', ...page.assess,
-    children: comps.map((c) => {
-      const its = items.filter((i) => i.component_id === c.id).sort((a, b) => a.seq - b.seq);
-      return its.length === 1 ? { ...leaf(its[0], c.name), id: c.id }
-        : { id: c.id, label: c.name, children: its.length ? its.map((i) => leaf(i)) : [{ id: c.id + '-none', label: 'No items yet', state: 'ready' as const, ...page.assess }] };
-    }) };
+    children: !split ? comps.map((c) => compNode(c, items.filter((i) => i.component_id === c.id)))
+      : [...comps.filter((c) => !c.per_section).map((c) => compNode(c, items.filter((i) => i.component_id === c.id))),
+        ...subs.map((s) => ({ id: 'sub-' + s.id, label: `Sub-section ${s.name}`,
+          children: comps.filter((c) => c.per_section).map((c) => compNode(c, items.filter((i) => i.component_id === c.id && i.section_id === s.id), ':' + s.id)) }))] };
   if (!assessments.children!.length) assessments.children = [{ id: 'assess-none', label: 'Plan assessments', state: 'ready', hint: 'Add an assessment to start', ...page.assess }];
 
   // Exam chain (theory) or sessional gradesheet

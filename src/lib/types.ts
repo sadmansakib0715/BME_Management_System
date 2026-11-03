@@ -43,5 +43,5 @@ export type ComponentKind = 'attendance' | 'class_test' | 'term_final' | 'lab_re
 export interface AssessmentComponent { id: string; offering_id: string; kind: ComponentKind; name: string; item_count: number; marks_each: number; weight: number; best_n: number | null; per_section: boolean; sort: number; }
 export type ItemStatus = 'planned' | 'scheduled' | 'held' | 'postponed' | 'cancelled';
 export type MarksStatus = 'none' | 'entering' | 'verified' | 'published' | 'locked';
-export interface AssessmentItem { id: string; component_id: string; offering_id: string; section_id: string | null; seq: number; title: string; held_on: string | null; held_time: string | null; total_marks: number; status: ItemStatus; marks_status: MarksStatus; responsible: string | null; syllabus: string | null; }
+export interface AssessmentItem { id: string; component_id: string; offering_id: string; section_id: string | null; seq: number; title: string; held_on: string | null; held_time: string | null; total_marks: number; status: ItemStatus; marks_status: MarksStatus; responsible: string | null; syllabus: string | null; date_later?: boolean; }
 export interface ItemDateHistory { id: string; item_id: string; old_date: string | null; new_date: string | null; reason: string | null; changed_by: string | null; changed_at: string; }

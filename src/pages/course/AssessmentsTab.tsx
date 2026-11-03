@@ -16,11 +16,11 @@ export type Draft = Omit<AssessmentComponent, 'id' | 'offering_id' | 'sort'> & {
 export const newComponentDraft = (course: Course): Draft =>
   ({ kind: 'other', name: '', item_count: 1, marks_each: 10, weight: 0, best_n: null, per_section: course.course_type !== 'theory' });
 
-/** Saves a component and regenerates its items. Shared by this tab and the progress tree. */
-export function useSaveComponent(offeringId: string, componentCount: number) {
+/** Saves a component and regenerates its items. Shared by this tab and the progress tree. Theory components are always whole-course. */
+export function useSaveComponent(offeringId: string, componentCount: number, isTheory: boolean) {
   return useWrite(async (d: Draft) => {
     const row = { offering_id: offeringId, kind: d.kind, name: d.name.trim(), item_count: d.item_count, marks_each: d.marks_each, weight: d.weight,
-      best_n: d.best_n || null, per_section: d.per_section, sort: d.id ? undefined : componentCount + 1 };
+      best_n: d.best_n || null, per_section: d.per_section && !isTheory, sort: d.id ? undefined : componentCount + 1 };
     const saved = d.id ? await must(supabase.from('assessment_components').update(row).eq('id', d.id).select().single())
       : await must(supabase.from('assessment_components').insert(row).select().single());
     await rpc.generateItems((saved as AssessmentComponent).id);
@@ -39,13 +39,14 @@ export default function AssessmentsTab({ offering, course, data }: TabProps) {
   const toast = useToast();
   const canEdit = isAdmin || teachersOf(offering.id).includes(me?.facultyId ?? '');
   const comps = data.components.filter((c) => c.offering_id === offering.id).sort((a, b) => a.sort - b.sort);
-  const sections = data.sections.filter((s) => s.offering_id === offering.id).sort((a, b) => a.name.localeCompare(b.name));
+  // Theory sub-sections (A1, A2) share one class, so only sessional courses split by sub-section.
+  const sections = course.course_type === 'theory' ? [] : data.sections.filter((s) => s.offering_id === offering.id).sort((a, b) => a.name.localeCompare(b.name));
   const [section, setSection] = useState<string>('all');
   const [edit, setEdit] = useState<Draft | null>(null);
   const [moving, setMoving] = useState<AssessmentItem | null>(null);
   const weight = comps.reduce((s, c) => s + Number(c.weight), 0);
 
-  const saveComp = useSaveComponent(offering.id, comps.length);
+  const saveComp = useSaveComponent(offering.id, comps.length, course.course_type === 'theory');
   const delComp = useWrite((id: string) => must(supabase.from('assessment_components').delete().eq('id', id)));
   const updItem = useWrite((a: { id: string; patch: Partial<AssessmentItem> }) => must(supabase.from('assessment_items').update(a.patch).eq('id', a.id)));
   const seed = useWrite(async () => { for (const d of THEORY_DEFAULTS) await saveComp.mutateAsync(d); });
@@ -70,7 +71,7 @@ export default function AssessmentsTab({ offering, course, data }: TabProps) {
                 <td className="font-medium">{c.name}</td><td className="text-muted">{labelOf(COMPONENT_KINDS, c.kind)}</td>
                 <td className="text-right tabular">{c.item_count}</td><td className="text-right tabular">{Number(c.marks_each)}</td>
                 <td className="text-right tabular">{c.best_n ? `Best ${c.best_n}` : 'All'}</td><td className="text-right tabular">{Number(c.weight)}%</td>
-                <td className="text-muted text-2xs">{c.per_section ? 'Per sub-section' : 'Whole course'}</td>
+                <td className="text-muted text-2xs">{c.per_section && sections.length > 1 ? 'Per sub-section' : 'Whole course'}</td>
                 {canEdit && <td><div className="flex gap-1 justify-end">
                   <Button size="sm" variant="ghost" aria-label={`Edit ${c.name}`} onClick={() => setEdit({ ...c })}><Pencil className="size-4" aria-hidden /></Button>
                   <Button size="sm" variant="ghost" aria-label={`Delete ${c.name}`} onClick={() => {
@@ -95,7 +96,7 @@ export default function AssessmentsTab({ offering, course, data }: TabProps) {
               {sections.length > 1 && <td>{secName(i.section_id) ?? 'All'}</td>}
               <td>
                 <button disabled={!canEdit} onClick={() => setMoving(i)} className="inline-flex items-center gap-1.5 text-sm rounded px-1.5 py-1 -mx-1.5 hover:bg-sunken disabled:hover:bg-transparent cursor-pointer disabled:cursor-default" aria-label={`Change date of ${i.title}`}>
-                  <CalendarDays className="size-3.5 text-subtle" aria-hidden />{i.held_on ? fmtDate(i.held_on, { weekday: 'short', day: 'numeric', month: 'short' }) : <span className="text-warn">Set date</span>}
+                  <CalendarDays className="size-3.5 text-subtle" aria-hidden />{i.held_on ? fmtDate(i.held_on, { weekday: 'short', day: 'numeric', month: 'short' }) : i.date_later ? <span className="date-later px-1.5 py-0.5">To be set later</span> : <span className="text-warn">Set date</span>}
                 </button>
               </td>
               <td>
@@ -165,6 +166,11 @@ export function RescheduleDialog({ item, onClose, admin }: { item: AssessmentIte
     if (r.ok && time !== (item!.held_time ?? '')) await must(supabase.from('assessment_items').update({ held_time: time || null }).eq('id', item!.id));
     return r;
   });
+  // "To be set later": clear any date (kept in the history, with the reason) and flag the item so it glows until dated.
+  const later = useWrite(async () => {
+    if (item!.held_on) await rpc.reschedule({ item: item!.id, date: null, reason, force: false });
+    await must(supabase.from('assessment_items').update({ date_later: true }).eq('id', item!.id));
+  });
   const go = (force: boolean) => move.mutate(force, {
     onSuccess: (r) => { if (!r.ok) { setConflicts(r.conflicts); return; } toast('ok', 'Date saved'); onClose(); },
     onError: (e) => toast('bad', e.message),
@@ -172,14 +178,18 @@ export function RescheduleDialog({ item, onClose, admin }: { item: AssessmentIte
   const changed = item && date !== (item.held_on ?? '');
   return (
     <Dialog open={!!item} onClose={onClose} title={item ? `Date for ${item.title}` : ''}
-      footer={<><Button onClick={onClose}>Cancel</Button>
+      footer={<><Button className="mr-auto" loading={later.isPending} disabled={(!!item?.date_later && !item.held_on) || (!!item?.held_on && !reason.trim())}
+          title={item?.held_on ? 'Give a reason first; the current date is cleared.' : undefined}
+          onClick={() => later.mutate(undefined, { onSuccess: () => { toast('ok', 'Marked to be set later'); onClose(); }, onError: (e) => toast('bad', e.message) })}>To be set later</Button>
+        <Button onClick={onClose}>Cancel</Button>
         {conflicts.length > 0 && admin && <Button variant="danger" loading={move.isPending} disabled={!reason.trim()} onClick={() => go(true)}>Override clash</Button>}
         <Button variant="primary" loading={move.isPending} disabled={!!item?.held_on && !!changed && !reason.trim()} onClick={() => go(false)}>Save</Button></>}>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Date" htmlFor="r-date"><Input id="r-date" type="date" value={date} onChange={(e) => { setDate(e.target.value); setConflicts([]); }} /></Field>
         <Field label="Time or slot" htmlFor="r-time" hint="Optional"><Input id="r-time" value={time} onChange={(e) => setTime(e.target.value)} placeholder="e.g. 2:30 pm" /></Field>
       </div>
-      {item?.held_on && changed && <Field label="Reason for the change" htmlFor="r-reason" hint="Kept in the history and sent to co-teachers."><Textarea id="r-reason" value={reason} onChange={(e) => setReason(e.target.value)} /></Field>}
+      {item?.date_later && !item.held_on && <p className="text-sm"><span className="date-later px-1.5 py-0.5">To be set later</span> <span className="text-muted">Pick a date when it is known.</span></p>}
+      {item?.held_on && <Field label="Reason for the change" htmlFor="r-reason" hint="Kept in the history and sent to co-teachers."><Textarea id="r-reason" value={reason} onChange={(e) => setReason(e.target.value)} /></Field>}
       {conflicts.length > 0 && <Callout tone="bad" title="Same cohort already has a class test that day">
         <ul className="list-disc pl-5">{conflicts.map((c, i) => <li key={i}>{c.course} · {c.title}</li>)}</ul>
         <p className="mt-1">{admin ? 'Pick another date, or override with a reason.' : 'Pick another date, or ask a department admin to override.'}</p></Callout>}

@@ -1,34 +1,34 @@
-import { ArrowRight, BellRing, BookOpen, CalendarDays, ClipboardCheck, FileSpreadsheet, History, LineChart, Lock, ShieldCheck, UserCog, Users } from 'lucide-react';
+import { ArrowRight, BellRing, BookOpen, CalendarClock, CalendarDays, ClipboardCheck, FileSpreadsheet, GitBranch, GraduationCap, History, LineChart, Lock, ShieldCheck, UserCog, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { IllCalendar, IllDepartment, IllExamChain, IllImport, IllOutcomes, IllPlan, IllSetup, IllTasks, InkMountains } from '@/components/illustrations';
+import { IllCalendar, IllDepartment, IllExamChain, IllImport, IllOutcomes, IllPlan, IllTasks, IllTree, InkMountains } from '@/components/illustrations';
 
 /** "How it works": a short illustrated tour of the whole system. Shown in the app and, signed out, from the sign-in page. */
 
 const FLOW: { icon: ReactNode; title: string; text: string; who: string }[] = [
   { icon: <FileSpreadsheet />, title: 'Set up the term', text: 'Import the Activity Tracker workbook, or add courses, sections and dates by hand in Term setup.', who: 'Admin' },
   { icon: <UserCog />, title: 'Assign roles', text: 'Teachers per section, question setters, moderators, scrutinizers and gradesheet roles. Conflicts are blocked.', who: 'Admin' },
-  { icon: <BookOpen />, title: 'Plan each course', text: 'Write the course outcomes and the assessment plan.', who: 'Faculty' },
-  { icon: <CalendarDays />, title: 'Fix the routine', text: 'Set class-test dates. One cohort never gets two class tests on the same day.', who: 'Admin or faculty' },
-  { icon: <ClipboardCheck />, title: 'Run the exam workflow', text: 'Question papers to the HOD, step by step. Each step opens when the one before it is done.', who: 'Everyone' },
-  { icon: <BellRing />, title: 'Get notified', text: 'Your start page and a short email show when it is your turn.', who: 'Automatic' },
+  { icon: <BookOpen />, title: 'Plan each course', text: 'Write the course outcomes, map them to the POs, and set the assessment plan.', who: 'Faculty' },
+  { icon: <CalendarDays />, title: 'Fix the routine', text: 'Set class-test dates, or mark one “to be set later” and it glows red until it is set. One cohort never gets two class tests on the same day.', who: 'Admin or faculty' },
+  { icon: <ClipboardCheck />, title: 'Hold assessments, run the exam', text: 'Class tests and lab work first, then the term final from question papers to the HOD, or the sessional gradesheet. Each step opens when the one before it is done.', who: 'Everyone' },
+  { icon: <GraduationCap />, title: 'Close out with OBE', text: 'Enter the CO and PO attainment from the course workbook, write the CAR, and complete the course file.', who: 'Faculty, then OBE Cell' },
 ];
 
 const FEATURES: { art: ReactNode; title: string; text: string; to: string; admin?: boolean }[] = [
-  { art: <IllTasks />, title: 'My courses', text: 'Your start page: each course you teach or examine, how it is going, and your calendar of class tests and exams.', to: '/' },
+  { art: <IllTasks />, title: 'My courses', text: 'Your start page: each course you teach or examine, how it is going, and your calendar of class tests and exams. Switch to Tree view to see them all as one tree.', to: '/' },
+  { art: <IllTree />, title: 'Progress tree', text: 'Every step of a course as a colour-coded tree: setup, assessments, exam or gradesheet, OBE and close-out. Click a step to change its status or set its date. On My courses, on each course, and for the whole department.', to: '/?view=tree' },
   { art: <IllExamChain />, title: 'Theory exam chain', text: 'Question papers → moderation → printing → scripts → scrutiny → gradesheet → HOD, with correction rounds.', to: '/courses' },
   { art: <IllCalendar />, title: 'Class tests & calendar', text: 'Every class test and exam in one calendar, and a guard against two class tests for one cohort on the same day.', to: '/calendar' },
-  { art: <IllPlan />, title: 'Assessment plans', text: 'Components and how many of each, per course or sessional sub-section. Each item shows whether it is held and whether its marks are under evaluation or published.', to: '/courses' },
-  { art: <IllOutcomes />, title: 'OBE', text: 'Course outcomes mapped to the program outcomes by strength, which courses are ready, and a department-wide coverage matrix.', to: '/outcomes' },
-  { art: <IllDepartment />, title: 'Department overview', text: 'Term-final progress and assessments held across every course. The HOD also sees workload and setup gaps.', to: '/dashboard' },
-  { art: <IllSetup />, title: 'Term setup by hand', text: 'Term dates, courses and sections, teachers and exam roles, and the class-test routine, tab by tab.', to: '/admin/term', admin: true },
-  { art: <IllImport />, title: 'Workbook import', text: 'Or fill the whole term from the existing spreadsheet: read in the browser, every correction shown first.', to: '/admin/term/import', admin: true },
+  { art: <IllPlan />, title: 'Assessment plans', text: 'Components and how many of each. Theory sections A1 and A2 share one plan; lab sub-sections are tracked separately. Each item shows whether it is held and whether its marks are under evaluation or published.', to: '/courses' },
+  { art: <IllOutcomes />, title: 'OBE', text: 'COs mapped to POs and K/P/A, imported CO and PO attainment against the 40% threshold, the CAR with review, the course file, program PO per batch, BUGS resolutions and the CQI log.', to: '/outcomes' },
+  { art: <IllDepartment />, title: 'Department overview', text: 'Assessments held and term-final progress across every course, and the department progress tree grouped by level and term. The HOD also sees workload and setup gaps.', to: '/dashboard' },
+  { art: <IllImport />, title: 'Term setup', text: 'Import the whole term from the Activity Tracker workbook, with every correction shown first, or set dates, courses, teachers, exam roles and the class-test routine by hand.', to: '/admin/term', admin: true },
 ];
 
 const ROLES: { icon: ReactNode; title: string; points: string[] }[] = [
-  { icon: <Users />, title: 'Faculty', points: ['See your courses and calendar at a glance', 'Write course outcomes and assessment plans', 'Set class-test dates for your courses'] },
+  { icon: <Users />, title: 'Faculty', points: ['See your courses, calendar and progress tree at a glance', 'Write course outcomes and assessment plans', 'Set class-test dates, or leave them for later', 'Enter attainment and write the CAR'] },
   { icon: <ClipboardCheck />, title: 'Exam roles', points: ['Prepare, moderate or scrutinize papers', 'Return a paper for correction', 'Steps open only when the previous one is done'] },
-  { icon: <LineChart />, title: 'HOD & admins', points: ['Set up the term by import or by hand', 'Assign roles and manage access', 'See workload across the department'] },
+  { icon: <LineChart />, title: 'HOD & admins', points: ['Set up the term by import or by hand', 'Assign roles and manage access', 'Review and finalise CARs, record BUGS resolutions', 'See the whole department in one tree'] },
 ];
 
 const SAFEGUARDS: { icon: ReactNode; title: string; text: string }[] = [
@@ -36,6 +36,8 @@ const SAFEGUARDS: { icon: ReactNode; title: string; text: string }[] = [
   { icon: <Lock />, title: 'Clear ownership', text: 'Each exam step belongs to one person. Only they, or an admin, can move it on.' },
   { icon: <History />, title: 'Everything is audited', text: 'Changes to assignments, exam steps, dates and access are logged with before and after values.' },
   { icon: <BellRing />, title: 'Email when it is your turn', text: 'A short note when your exam step opens or a paper comes back for correction.' },
+  { icon: <CalendarClock />, title: 'Nothing left undated', text: 'A date marked “to be set later” glows dark red on every page until someone sets it.' },
+  { icon: <GitBranch />, title: 'Edit where you look', text: 'Statuses changed in the progress tree go through the same checks and permissions as the course pages.' },
 ];
 
 const Icon = ({ children }: { children: ReactNode }) => (
@@ -64,7 +66,7 @@ export default function Guide({ signedOut = false, isAdmin = false }: { signedOu
 
       <section aria-labelledby="g-flow">
         <h2 id="g-flow" className="text-lg font-semibold tracking-tight">A term, start to finish</h2>
-        <p className="text-sm text-muted mt-1">Six stages. Each one unlocks the next.</p>
+        <p className="text-sm text-muted mt-1">Six stages. Each one unlocks the next. Your start page and progress tree always show what is next.</p>
         <ol className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {FLOW.map((f, i) => (
             <li key={f.title} className="card p-4 flex gap-3">

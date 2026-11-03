@@ -62,7 +62,7 @@ export default function SetupRoutine() {
                 <tr key={r.i.id}>
                   <td>
                     <button type="button" onClick={() => setMoving(r.i)} className="inline-flex items-center gap-1.5 text-sm rounded px-1.5 py-1 -mx-1.5 hover:bg-sunken cursor-pointer" aria-label={`Set date for ${r.c.code} ${r.i.title}`}>
-                      <CalendarDays className="size-3.5 text-subtle" aria-hidden />{r.i.held_on ? fmtDate(r.i.held_on, { weekday: 'short', day: 'numeric', month: 'short' }) : <span className="text-brand-ink font-medium">Set date</span>}
+                      <CalendarDays className="size-3.5 text-subtle" aria-hidden />{r.i.held_on ? fmtDate(r.i.held_on, { weekday: 'short', day: 'numeric', month: 'short' }) : r.i.date_later ? <span className="date-later px-1.5 py-0.5">To be set later</span> : <span className="text-brand-ink font-medium">Set date</span>}
                     </button>
                   </td>
                   <td><Link to={`/courses/${r.o.id}/assessments`} className="link font-mono text-sm">{r.c.code}</Link></td>

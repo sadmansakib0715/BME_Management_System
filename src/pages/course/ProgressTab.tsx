@@ -18,9 +18,9 @@ export default function ProgressTab({ offering, course, data }: TabProps) {
   const obe = useCourseObe(offering, data.term);
   const { canEdit, onPick, onSetDate, dateDialog } = useTreeEdits(data);
   const comps = data.components.filter((c) => c.offering_id === offering.id);
-  const sections = data.sections.filter((s) => s.offering_id === offering.id);
+  const sections = course.course_type === 'theory' ? [] : data.sections.filter((s) => s.offering_id === offering.id);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const saveComp = useSaveComponent(offering.id, comps.length);
+  const saveComp = useSaveComponent(offering.id, comps.length, course.course_type === 'theory');
   const teaches = isAdmin || teachersOf(offering.id).includes(me?.facultyId ?? '');
 
   if (obe.isLoading) return <Spinner label="Loading progress" />;

@@ -108,6 +108,7 @@ function StatusMenu({ node, anchor, onClose, onPick, canEdit, onSetDate }: { nod
           className="mx-2 mt-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-md border border-brand/40 bg-brand-soft px-2.5 py-1.5 text-left font-semibold text-brand-ink hover:border-brand focus:border-brand focus:outline-none cursor-pointer">
           <CalendarDays className="size-4" aria-hidden />
           <span className="flex-1">{dated.date ? 'Change the date' : 'Set the date'}</span>
+          {dated.later && <span className="date-later px-1 text-2xs">later</span>}
           {dated.date && <span className="text-2xs font-medium">{fmtDate(dated.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>}
         </button>)}
       {node.edits?.length ? node.edits.map((g) => {
@@ -150,10 +151,10 @@ interface Ctx { nextId?: string; foldAt?: number; openMap: Record<string, boolea
 
 function NodeChip({ n, isRoot, open, ctx }: { n: RolledNode; isRoot?: boolean; open: boolean; ctx: Ctx }) {
   const parent = !!n.children;
-  const showHint = !parent && (n.state === 'active' || n.state === 'returned') && n.hint;
+  const showHint = !parent && (n.state === 'active' || n.state === 'returned' || n.dated?.later) && n.hint;
   const pct = n.total ? Math.round((n.done / n.total) * 100) : 0;
   const cls = clsx('ptree-node', isRoot ? 'ptree-root' : parent ? (n.tone === 'course' ? 'ptree-course' : 'ptree-branch') : STEP[n.state],
-    n.id === ctx.nextId && 'ptree-next', ctx.menuId === n.id && 'ptree-node-open');
+    n.id === ctx.nextId && 'ptree-next', ctx.menuId === n.id && 'ptree-node-open', n.dated?.later && 'ptree-later');
   const body = (
     <>
       <Dot state={n.state} />

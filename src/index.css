@@ -32,6 +32,7 @@
     --tone-group: 71 85 105; --tone-group-soft: 236 240 245;
     --tone-course: 155 19 19; --tone-course-soft: 251 236 236;
     --root-a: 155 19 19; --root-b: 104 12 32;
+    --later: 128 0 0;   /* dark red reminder: a date marked "to be set later" */
     color-scheme: light;
   }
   :root[data-theme="dark"] {
@@ -58,6 +59,7 @@
     --tone-group: 176 192 212; --tone-group-soft: 44 50 60;
     --tone-course: 246 170 170; --tone-course-soft: 70 28 28;
     --root-a: 168 52 52; --root-b: 96 24 40;
+    --later: 240 96 96;
     color-scheme: dark;
   }
   html { -webkit-text-size-adjust: 100%; }
@@ -158,6 +160,12 @@
   .ptree-fill-returned { background: rgb(var(--warn)); }
   .ptree-fill-ready { background: rgb(var(--brand) / .55); }
   .ptree-fill-locked { background: rgb(var(--line-strong)); }
+  /* A date marked "to be set later": a slow dark-red glow until someone sets it. */
+  .date-later { color: rgb(var(--later)); font-weight: 700; background: rgb(var(--later) / .08); border-radius: 6px;
+                box-shadow: 0 0 0 1.5px rgb(var(--later) / .6), 0 0 10px 1px rgb(var(--later) / .35); animation: later-glow 2.4s ease-in-out infinite; }
+  .ptree-later { border-color: rgb(var(--later) / .7) !important; box-shadow: 0 0 0 1.5px rgb(var(--later) / .6), 0 0 12px 2px rgb(var(--later) / .4);
+                 animation: later-glow 2.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .date-later, .ptree-later { animation: none; } }
   .kbd { @apply font-mono text-2xs px-1.5 py-0.5 rounded border border-line bg-sunken text-muted; }
   /* Click feedback (src/lib/tap.ts): squish, spring back, and a slate ripple. Wide targets get a gentler squish. */
   .tap    { animation: tap-press 340ms cubic-bezier(.34,1.56,.64,1), tap-ripple 480ms ease-out; }
@@ -171,6 +179,7 @@
   .car-print { position: absolute; left: 0; top: 0; width: 100%; border: 0; box-shadow: none; }
 }
 
+@keyframes later-glow { 0%, 100% { box-shadow: 0 0 0 1.5px rgb(var(--later) / .6), 0 0 6px 0 rgb(var(--later) / .25); } 50% { box-shadow: 0 0 0 1.5px rgb(var(--later) / .85), 0 0 16px 3px rgb(var(--later) / .5); } }
 @keyframes ptree-call { 0% { box-shadow: 0 0 0 2px rgb(var(--brand) / .55), 0 0 0 2px rgb(var(--brand) / .35); } 100% { box-shadow: 0 0 0 2px rgb(var(--brand) / .55), 0 0 0 10px rgb(var(--brand) / 0); } }
 @keyframes tap-press    { 0% { transform: scale(1); } 30% { transform: scale(.92); } 70% { transform: scale(1.03); } 100% { transform: scale(1); } }
 @keyframes tap-press-lg { 0% { transform: scale(1); } 30% { transform: scale(.985); } 70% { transform: scale(1.004); } 100% { transform: scale(1); } }

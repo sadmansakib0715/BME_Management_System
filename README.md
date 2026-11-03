@@ -72,10 +72,10 @@ To explore with fictional data instead, run `supabase/seed_demo.sql` on a develo
 
 Either way, everything can be adjusted afterwards in the same tabs. Teachers add course outcomes on each course page.
 
-**Existing databases:** run `supabase/migrations/0010_notify_only.sql` and then `0011_obe_results.sql` once each in the SQL Editor.
+**Existing databases:** run `supabase/migrations/0010_notify_only.sql`, `0011_obe_results.sql` and then `0012_date_later.sql` once each in the SQL Editor.
 0010 lets gradesheet preparation start without published marks, which this site no longer collects. 0011 adds the OBE
 tables (imported attainment, CAR, course file, BUGS resolutions, CQI log) and flags BME 300/350/400 as culminating.
-(`setup.sql` already includes both.)
+0012 adds the "To be set later" choice for assessment dates. (`setup.sql` already includes all three.)
 
 ### 4. Deploy to GitHub Pages
 1. Repo **Settings → Pages → Source: GitHub Actions**.

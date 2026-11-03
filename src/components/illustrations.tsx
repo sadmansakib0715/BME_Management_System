@@ -193,3 +193,41 @@ export function IllPlan() {
     </Scene>
   );
 }
+
+/** Progress tree: a maroon course root, stage branches in their own hues, steps filled by state, one date glowing "to be set later". */
+export function IllTree() {
+  const c = (v: string, a = 1) => `rgb(var(--${v}) / ${a})`;
+  const stages: { y: number; tone: string; leaves: { state: 'ok' | 'info' | 'later' | 'ready' }[] }[] = [
+    { y: 26, tone: 'tone-setup', leaves: [{ state: 'ok' }, { state: 'ok' }] },
+    { y: 60, tone: 'tone-assess', leaves: [{ state: 'info' }, { state: 'later' }] },
+    { y: 94, tone: 'tone-exam', leaves: [{ state: 'ready' }] },
+    { y: 120, tone: 'tone-obe', leaves: [{ state: 'ready' }] },
+  ];
+  const leafFill = { ok: c('ok-soft'), info: c('info-soft'), later: c('later', 0.12), ready: c('surface') };
+  const leafStroke = { ok: c('ok', 0.6), info: c('info', 0.6), later: c('later'), ready: c('line-strong') };
+  return (
+    <Scene>
+      {stages.map((s) => <path key={s.y} d={`M64 70 H76 V${s.y} H92`} fill="none" strokeWidth="1.5" style={{ stroke: c(s.tone, 0.6) }} />)}
+      <rect x="14" y="60" width="50" height="20" rx="5" style={{ fill: c('root-a') }} />
+      <rect x="22" y="68" width="30" height="4" rx="2" className="fill-surface" />
+      {stages.map((s) => (
+        <g key={s.y}>
+          <rect x="92" y={s.y - 8} width="50" height="16" rx="4" strokeWidth="1" style={{ fill: c(`${s.tone}-soft`), stroke: c(s.tone, 0.5) }} />
+          <rect x="100" y={s.y - 2} width="30" height="4" rx="2" style={{ fill: c(s.tone) }} />
+          {s.leaves.map((l, i) => {
+            const ly = s.leaves.length === 1 ? s.y : s.y - 8 + i * 16;
+            return (
+              <g key={i}>
+                <path d={`M142 ${s.y} H150 V${ly} H160`} fill="none" strokeWidth="1.2" style={{ stroke: c(s.tone, 0.5) }} />
+                {l.state === 'later' && <rect x="156" y={ly - 10} width="66" height="20" rx="7" style={{ fill: c('later', 0.18) }} />}
+                <rect x="160" y={ly - 6} width="58" height="12" rx="3" strokeWidth={l.state === 'later' ? 1.6 : 1} style={{ fill: leafFill[l.state], stroke: leafStroke[l.state] }} />
+                <circle cx="168" cy={ly} r="2.5" style={{ fill: l.state === 'ready' ? 'none' : leafStroke[l.state], stroke: leafStroke[l.state] }} />
+                <rect x="175" y={ly - 1.5} width="34" height="3" rx="1.5" style={{ fill: l.state === 'later' ? c('later') : c('ink', 0.55) }} />
+              </g>
+            );
+          })}
+        </g>
+      ))}
+    </Scene>
+  );
+}
