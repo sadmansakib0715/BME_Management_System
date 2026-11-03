@@ -16,6 +16,9 @@ export default function Car({ offering, course, data, obe, canEdit, isAdmin }: O
   const toast = useToast();
   const { teachersOf, nameOf } = useTerm();
   const car = obe.car;
+  // Past offerings have no term assignments; their CAR shows the teachers named in the outline.
+  const assigned = teachersOf(offering.id).map(nameOf);
+  const teachers = assigned.length ? assigned : [...new Set((obe.docs?.instructors ?? []).map((i) => i.name.trim()))];
   const status: CarStatus = car?.status ?? 'draft';
   const blank = { part_c: car?.part_c ?? '', part_d: car?.part_d ?? '', part_e: car?.part_e ?? '' };
   const [parts, setParts] = useState(blank);
@@ -51,6 +54,7 @@ export default function Car({ offering, course, data, obe, canEdit, isAdmin }: O
           {isAdmin && status !== 'draft' && <Button size="sm" variant="ghost" onClick={() => go({ status: 'draft' }, 'Reopened as draft')}>Reopen</Button>}
         </div>
       </div>
+      {car?.review_note && <Callout tone="info">{car.review_note}</Callout>}
       {missing.length > 0 && <Callout tone="warn" title="Info missing">{missing.join(', ')} {missing.length === 1 ? 'has' : 'have'} no attainment result. Add it in Attainment before submitting.</Callout>}
       {flags.length > 0 && <Callout tone="info" title="Comment and action needed">{flags.join(', ')} {flags.length === 1 ? 'is' : 'are'} below or within 10 points of the threshold, so Part C needs a comment and Part E an action.</Callout>}
 
@@ -63,7 +67,7 @@ export default function Car({ offering, course, data, obe, canEdit, isAdmin }: O
               <dt className="text-muted">Course</dt><dd>{course.code} · {course.title}</dd>
               <dt className="text-muted">Level and term</dt><dd>{course.level ? `Level ${course.level}${course.term_no ? `, Term ${course.term_no}` : ''}` : '—'}{offering.batch ? ` · Cohort ${offering.batch}` : ''}</dd>
               <dt className="text-muted">Academic term</dt><dd>{data.term.name}</dd>
-              <dt className="text-muted">Teachers</dt><dd>{teachersOf(offering.id).map(nameOf).join(', ') || '—'}</dd>
+              <dt className="text-muted">Teachers</dt><dd>{teachers.join(', ') || '—'}</dd>
               <dt className="text-muted">Last term offered</dt><dd>{obe.prev?.termName ?? '—'}</dd>
             </dl>
           </section>
@@ -89,8 +93,8 @@ export default function Car({ offering, course, data, obe, canEdit, isAdmin }: O
           </section>
           <section>
             <h3 className="text-sm font-semibold mb-2">Signatures</h3>
-            <div className="grid sm:grid-cols-2 gap-4">{teachersOf(offering.id).map((t) => (
-              <div key={t} className="text-sm"><div className="h-10 border-b border-line-strong" /><div className="mt-1">{nameOf(t)}</div></div>))}</div>
+            <div className="grid sm:grid-cols-2 gap-4">{teachers.map((t) => (
+              <div key={t} className="text-sm"><div className="h-10 border-b border-line-strong" /><div className="mt-1">{t}</div></div>))}</div>
           </section>
         </div>
       </Card>

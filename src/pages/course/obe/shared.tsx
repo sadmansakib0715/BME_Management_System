@@ -5,11 +5,11 @@ import type { TabProps } from '../shared';
 
 export interface ObeProps extends TabProps { obe: CourseObe; canEdit: boolean; isAdmin: boolean }
 
-/** A set of small on/off chips (taxonomy levels, delivery, tools). */
+/** A set of small on/off chips (taxonomy levels, delivery, tools). Values outside the list (as worded in an imported document) show too. */
 export function Chips({ options, value, onChange, disabled, label }: { options: string[]; value: string[]; onChange: (v: string[]) => void; disabled?: boolean; label: string }) {
   return (
     <div role="group" aria-label={label} className="flex flex-wrap gap-1">
-      {options.map((o) => {
+      {[...options, ...value.filter((v) => !options.includes(v))].map((o) => {
         const on = value.includes(o);
         return (
           <button key={o} type="button" aria-pressed={on} disabled={disabled} onClick={() => onChange(on ? value.filter((x) => x !== o) : [...value, o])}

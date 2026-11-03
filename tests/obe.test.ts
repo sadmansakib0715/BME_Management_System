@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attained, coWarnings, courseFile, kProfiles, mappedPos, nearThreshold, parseAttainment } from '../src/lib/obe';
+import { attained, byAssessment, coCoverage, coWarnings, courseFile, criteriaWarnings, kProfiles, mappedPos, nearThreshold, parseAttainment } from '../src/lib/obe';
 import type { CoPo } from '../src/lib/types';
 
 describe('OBE rules', () => {
@@ -50,5 +50,28 @@ describe('OBE rules', () => {
     const items = courseFile({ cos: [{ id: 'a' }], coPo: [{ co_id: 'a', po_code: 'PO1', strength: 1 }], attainment: [{ offering_id: 'o', outcome_type: 'CO', code: 'CO1', value: 70, source: 'import', updated_at: '' }],
       car: { status: 'final' }, files: [{ offering_id: 'o', slot: 'outline', done: true, link: null }], hasTeachers: true, hasResolution: false });
     expect(items.filter((i) => i.done).map((i) => i.slot)).toEqual(['outline', 'mapping', 'instructors', 'attainment', 'car']);
+  });
+
+  it('counts the marks that assess each CO (BME 203 Jul 2025 term final)', () => {
+    const cos = [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }, { id: 'c4' }];
+    const crit = [{ id: 'a', max_marks: 15 }, { id: 'b', max_marks: 15 }, { id: 'c', max_marks: 15 }, { id: 'd', max_marks: 16 }, { id: 'e', max_marks: 18 }, { id: 'f', max_marks: 11 }];
+    const links = [['a', 'c3'], ['b', 'c1'], ['c', 'c1'], ['d', 'c2'], ['e', 'c2'], ['f', 'c4']].map(([criterion_id, co_id]) => ({ criterion_id, co_id }));
+    const cov = coCoverage(cos, crit, links);
+    expect(cov.map((c) => c.marks)).toEqual([30, 34, 15, 11]);
+    expect(cov[0].share).toBeCloseTo(33.33, 2);
+    expect(criteriaWarnings(cos, crit.map((c) => ({ ...c, assessment: 'Term Final', label: c.id })), links)).toEqual([]);
+  });
+
+  it('warns about untagged criteria and unassessed COs', () => {
+    const w = criteriaWarnings([{ id: 'c1' }, { id: 'c2' }],
+      [{ id: 'a', assessment: 'Presentation 01', label: 'Clinical need', max_marks: 10 }, { id: 'b', assessment: 'Report', label: 'Formatting', max_marks: 5 }],
+      [{ criterion_id: 'a', co_id: 'c1' }]);
+    expect(w).toEqual(['CO2 is not assessed by any question or criterion.', 'Report · Formatting is not tagged to a CO.']);
+    expect(criteriaWarnings([{ id: 'c1' }], [], [])).toEqual([]);
+  });
+
+  it('groups criteria by assessment in entry order', () => {
+    const g = byAssessment([{ assessment: 'Demo 01', sort: 2 }, { assessment: 'Presentation 01', sort: 0 }, { assessment: 'Presentation 01', sort: 1 }]);
+    expect(g.map((x) => [x.assessment, x.items.length])).toEqual([['Presentation 01', 2], ['Demo 01', 1]]);
   });
 });

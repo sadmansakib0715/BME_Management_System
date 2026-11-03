@@ -1,10 +1,11 @@
 import { Copy, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Callout, Card, CardHeader, Empty, Field, Select, Textarea, useToast } from '@/components/ui';
+import { Button, Callout, Card, CardHeader, Empty, Field, SegTabs, Select, Textarea, useToast } from '@/components/ui';
 import { must, useBugs, usePOs, useWrite } from '@/lib/api';
-import { coWarnings, DELIVERY, DOMAIN_LEVELS, KPA, TOOLS } from '@/lib/obe';
+import { coWarnings, CULMINATING_POS, DELIVERY, DOMAIN_LEVELS, KPA, TOOLS } from '@/lib/obe';
 import { supabase } from '@/lib/supabase';
 import type { CourseOutcome } from '@/lib/types';
+import CoPoBoard from './CoPoBoard';
 import { Chips, type ObeProps } from './shared';
 
 type Draft = { id?: string; tmp?: string; statement: string; domain_levels: string[]; delivery: string[]; tools: string[]; kpa: string[]; pos: string[] };
@@ -18,6 +19,7 @@ export default function CoMapping({ offering, course, obe, canEdit, isAdmin }: O
   const initial = useMemo<Draft[]>(() => obe.cos.map((c) => ({ id: c.id, statement: c.statement, domain_levels: c.domain_levels ?? [], delivery: c.delivery ?? [], tools: c.tools ?? [], kpa: c.kpa ?? [],
     pos: obe.coPo.filter((m) => m.co_id === c.id).map((m) => m.po_code) })), [obe.cos, obe.coPo]);
   const [cos, setCos] = useState<Draft[]>(initial);
+  const [view, setView] = useState<'connect' | 'table'>('connect');
   useEffect(() => setCos(initial), [initial]);
   const dirty = JSON.stringify(cos) !== JSON.stringify(initial);
   const set = (i: number, patch: Partial<Draft>) => setCos((x) => x.map((c, j) => (j === i ? { ...c, ...patch } : c)));
@@ -51,6 +53,8 @@ export default function CoMapping({ offering, course, obe, canEdit, isAdmin }: O
     cos.flatMap((c, i) => c.pos.map((po) => ({ co_id: c.id ?? c.tmp ?? String(i), po_code: po, strength: 1 as const }))), poList);
   const add = () => setCos((x) => [...x, { tmp: crypto.randomUUID(), statement: '', domain_levels: [], delivery: [], tools: [], kpa: [], pos: [] }]);
   const res = bugs.data?.find((b) => b.id === offering.co_resolution_id);
+  const saveButton = <Button size="sm" variant="primary" disabled={!dirty || cos.some((c) => !c.statement.trim())} loading={save.isPending}
+    onClick={() => save.mutate(cos, { onSuccess: () => toast('ok', 'COs and mapping saved'), onError: (e) => toast('bad', e.message) })}>Save</Button>;
 
   return (
     <div className="space-y-5">
@@ -59,8 +63,7 @@ export default function CoMapping({ offering, course, obe, canEdit, isAdmin }: O
           actions={canEdit && <>
             {obe.prev && obe.prev.cos.length > 0 && cos.length === 0 && <Button size="sm" icon={<Copy className="size-4" aria-hidden />} onClick={fromPrev}>Copy from {obe.prev.termName}</Button>}
             <Button size="sm" icon={<Plus className="size-4" aria-hidden />} disabled={cos.length >= 12} onClick={add}>Add CO</Button>
-            <Button size="sm" variant="primary" disabled={!dirty || cos.some((c) => !c.statement.trim())} loading={save.isPending}
-              onClick={() => save.mutate(cos, { onSuccess: () => toast('ok', 'COs and mapping saved'), onError: (e) => toast('bad', e.message) })}>Save</Button></>} />
+            {saveButton}</>} />
         {cos.length === 0 ? <Empty title="No COs yet">{obe.prev?.cos.length ? `Copy last term's ${obe.prev.cos.length} COs from ${obe.prev.termName}, then revise them.` : 'Add the COs approved for this course.'}</Empty> : (
           <ol className="divide-y divide-line">{cos.map((c, i) => (
             <li key={c.id ?? c.tmp} className="px-4 py-3 grid gap-3 md:grid-cols-[48px_1fr_auto]">
@@ -83,8 +86,14 @@ export default function CoMapping({ offering, course, obe, canEdit, isAdmin }: O
       </Card>
 
       {cos.length > 0 && <Card>
-        <CardHeader title="CO–PO mapping" subtitle="Tick each PO a CO addresses. A PO no CO maps to is NA for this course." />
-        <div className="overflow-x-auto"><table className="table">
+        <CardHeader title="CO–PO mapping" subtitle="Connect each CO to the POs it addresses. A PO no CO maps to is NA for this course."
+          actions={<>
+            <SegTabs label="Mapping view" value={view} onChange={setView} options={[{ value: 'connect', label: 'Connect' }, { value: 'table', label: 'Table' }]} />
+            {canEdit && dirty && saveButton}</>} />
+        {view === 'connect'
+          ? <CoPoBoard cos={cos.map((c, i) => ({ key: c.id ?? c.tmp ?? String(i), code: `CO${i + 1}`, statement: c.statement, pos: c.pos }))} pos={poList}
+              expected={CULMINATING_POS[course.code]} disabled={!canEdit} onChange={(i, next) => set(i, { pos: next })} />
+          : <div className="overflow-x-auto"><table className="table">
           <thead><tr><th>CO</th>{poList.map((p) => <th key={p.code} className="text-center" title={`${p.title} (${p.k_profiles ?? '—'})`}>{p.code}</th>)}</tr></thead>
           <tbody>{cos.map((c, i) => (
             <tr key={c.id ?? c.tmp}><td className="font-mono font-semibold">CO{i + 1}</td>
@@ -94,7 +103,7 @@ export default function CoMapping({ offering, course, obe, canEdit, isAdmin }: O
                     onChange={() => toggle(i, 'pos', p.code)} aria-label={`CO${i + 1} maps to ${p.code}`} />
                 </td>))}
             </tr>))}</tbody>
-        </table></div>
+        </table></div>}
       </Card>}
 
       {cos.length > 0 && <Card>
