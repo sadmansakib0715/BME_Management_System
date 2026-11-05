@@ -95,3 +95,6 @@ begin
   end if;
   return jsonb_build_object('from', src, 'cos', n_co, 'criteria', n_cr, 'rubrics', n_rb, 'outline', docs);
 end $$;
+
+-- Let the API see the new tables and functions now, not after its next restart.
+notify pgrst, 'reload schema';

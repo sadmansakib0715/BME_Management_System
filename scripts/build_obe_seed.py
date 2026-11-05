@@ -197,13 +197,16 @@ def main(src, dst):
     w(f"-- Source: {d['meta']['source']}; built {d['meta']['built_at']}.")
     w('-- Run AFTER migrations/0013_obe_master.sql. Safe to run again: nothing a teacher has entered is overwritten.')
     w('begin;')
-    w('create temp table stg_off (term_code text, term_name text, course_code text, student_batch text, contents text, objectives text, outline_text text,'
-      ' instructors jsonb, marks_distribution jsonb, components jsonb, source jsonb, issues text[], has_outline boolean, has_workbook boolean) on commit drop;')
-    w('create temp table stg_co (term_code text, course_code text, no int, statement text, domain_levels text[], delivery text[], tools text[], kpa text[], pos text[]) on commit drop;')
-    w('create temp table stg_crit (term_code text, course_code text, sort int, assessment text, label text, max_marks numeric, cos text[]) on commit drop;')
-    w('create temp table stg_att (term_code text, course_code text, outcome_type text, code text, value numeric, src text) on commit drop;')
-    w('create temp table stg_car (term_code text, course_code text, part_c text, part_d text, part_e text) on commit drop;')
-    w('create temp table stg_bugs (meeting_no text, held_on date, link text, term_code text, course_code text) on commit drop;')
+    # Ordinary staging tables (not temp tables): the Supabase SQL Editor does not keep one session for the whole
+    # script, so "on commit drop" temp tables vanished between statements ("relation stg_off does not exist").
+    w(DROP_STAGING)
+    w('create table public.stg_off (term_code text, term_name text, course_code text, student_batch text, contents text, objectives text, outline_text text,'
+      ' instructors jsonb, marks_distribution jsonb, components jsonb, source jsonb, issues text[], has_outline boolean, has_workbook boolean);')
+    w('create table public.stg_co (term_code text, course_code text, no int, statement text, domain_levels text[], delivery text[], tools text[], kpa text[], pos text[]);')
+    w('create table public.stg_crit (term_code text, course_code text, sort int, assessment text, label text, max_marks numeric, cos text[]);')
+    w('create table public.stg_att (term_code text, course_code text, outcome_type text, code text, value numeric, src text);')
+    w('create table public.stg_car (term_code text, course_code text, part_c text, part_d text, part_e text);')
+    w('create table public.stg_bugs (meeting_no text, held_on date, link text, term_code text, course_code text);')
 
     terms = {}
     stats = {'offerings': 0, 'cos': 0, 'criteria': 0, 'att': 0, 'att_car': 0, 'cars': 0}
@@ -277,7 +280,9 @@ def main(src, dst):
     for tc, name in sorted(terms.items()):
         w(f"insert into public.terms (code, name) values ({q(tc)}, {q(name)}) on conflict (code) do nothing;")
     w(MERGE)
+    w(DROP_STAGING)
     w('commit;')
+    w("notify pgrst, 'reload schema';")
     Path(dst).write_text('\n'.join(out) + '\n')
     # One file to paste into the SQL Editor of an existing project: the 0013 migration, then this data.
     root = Path(__file__).resolve().parent.parent
@@ -286,8 +291,15 @@ def main(src, dst):
     (root / 'supabase' / 'update_obe_master.sql').write_text(
         '-- BME Workflow · OBE master data update for an EXISTING project (generated). Paste into Supabase → SQL Editor and run once.\n'
         f"-- = migrations {', '.join(m.name for m in migs)} + seed_obe_master.sql. Safe to run again.\n\n" + mig + '\n' + '\n'.join(out) + '\n')
+    # The tables and functions alone (small): for when the full file is too large for the SQL Editor or failed part-way.
+    (root / 'supabase' / 'update_obe_schema.sql').write_text(
+        '-- BME Workflow · OBE tables and functions only (generated). Run this first if update_obe_master.sql fails or is too large,\n'
+        '-- then run seed_obe_master.sql for the data. Safe to run again.\n\n' + mig + "\nnotify pgrst, 'reload schema';\n")
     print(f"wrote {dst}: {len(terms)} terms, " + ', '.join(f'{k} {v}' for k, v in stats.items()))
 
+
+DROP_STAGING = ('drop view if exists public.v_stg_off;\n'
+                'drop table if exists public.stg_off, public.stg_co, public.stg_crit, public.stg_att, public.stg_car, public.stg_bugs, public.stg_fresh, public.stg_nocrit cascade;')
 
 MERGE = r"""
 -- ---------------------------------------------------------------- merge
@@ -297,7 +309,7 @@ insert into public.offerings (term_id, course_id, status)
 select t.id, c.id, 'archived' from stg_off s join public.terms t on t.code = s.term_code join public.courses c on c.code = s.course_code
 on conflict (term_id, course_id) do nothing;
 
-create or replace temp view v_stg_off as
+create or replace view public.v_stg_off as
   select s.*, o.id as offering_id from stg_off s join public.terms t on t.code = s.term_code join public.courses c on c.code = s.course_code
     join public.offerings o on o.term_id = t.id and o.course_id = c.id;
 
@@ -312,7 +324,7 @@ on conflict (offering_id) do update set outline_text = excluded.outline_text, in
   components = case when public.obe_offering_docs.components = '[]' then excluded.components else public.obe_offering_docs.components end;
 
 -- COs and their mapping, only into offerings that have none yet.
-create temp table stg_fresh on commit drop as
+create table public.stg_fresh as
   select v.offering_id from v_stg_off v where not exists (select 1 from public.course_outcomes x where x.offering_id = v.offering_id);
 insert into public.course_outcomes (offering_id, code, statement, domain, level, sort, domain_levels, delivery, tools, kpa)
 select v.offering_id, 'CO' || s.no, s.statement,
@@ -329,7 +341,7 @@ on conflict do nothing;
 
 -- Assessment map (question parts and rubric criteria with CO tags), only where the teachers have none yet.
 -- (Only where the COs came from the master copy too, so the CO tags line up.)
-create temp table stg_nocrit on commit drop as
+create table public.stg_nocrit as
   select v.offering_id from v_stg_off v where v.offering_id in (select offering_id from stg_fresh)
      and not exists (select 1 from public.obe_criteria x where x.offering_id = v.offering_id);
 insert into public.obe_criteria (offering_id, assessment, label, max_marks, sort)

@@ -137,3 +137,6 @@ drop trigger if exists audit on public.obe_criteria;
 create trigger audit after insert or update or delete on public.obe_criteria for each row execute function public.tg_audit();
 drop trigger if exists audit on public.obe_offering_docs;
 create trigger audit after insert or update or delete on public.obe_offering_docs for each row execute function public.tg_audit('offering_id');
+
+-- Let the API see the new tables and functions now, not after its next restart.
+notify pgrst, 'reload schema';

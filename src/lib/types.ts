@@ -27,7 +27,7 @@ export interface CourseOutcome { id: string; offering_id: string; code: string; 
   domain_levels?: string[]; delivery?: string[]; tools?: string[]; kpa?: string[]; }
 
 // ---------------------------------------------------------------- OBE results (0011): imported attainment, CAR, course file, BUGS, CQI
-export interface ObeAttainment { offering_id: string; outcome_type: 'CO' | 'PO'; code: string; value: number | null; source: 'manual' | 'import'; updated_at: string; }
+export interface ObeAttainment { offering_id: string; outcome_type: 'CO' | 'PO'; code: string; value: number | null; source: 'manual' | 'import' | 'computed'; updated_at: string; }
 export type CarStatus = 'draft' | 'submitted' | 'reviewed' | 'final';
 export interface CarReport { offering_id: string; part_c: string; part_d: string; part_e: string; status: CarStatus; review_note: string | null; updated_at: string; }
 export type FileSlot = 'outline' | 'lecture_materials' | 'scripts' | 'attainment_workbook' | 'bsfs_feedback';
@@ -41,7 +41,9 @@ export interface ProgramPo { batch: string; po_code: string; value: number; cour
 export interface Instructor { name: string; room?: string; email?: string }
 export interface ObeDocs { offering_id: string; contents: string | null; objectives: string | null; outline_text: string | null; instructors: Instructor[];
   marks_distribution: { component: string; percent: number }[]; components: { component: string; weight: number; marks: number }[];
-  source: { folder?: string; files?: Record<string, string>; car_text?: string | null }; issues: string[]; copied_from: string | null; updated_at: string; }
+  source: { folder?: string; files?: Record<string, string>; car_text?: string | null }; issues: string[]; copied_from: string | null; updated_at: string;
+  /** 0015: outline fields for the outline PDF. */
+  assessment_strategy?: string | null; textbooks?: string | null; lecture_plan?: { lectures: string; topic: string; cos: string }[] }
 /** One question part or marking criterion of the assessment map, tagged to COs through obe_criterion_cos. */
 export interface ObeCriterion { id: string; offering_id: string; assessment: string; label: string; max_marks: number; sort: number; }
 export interface CriterionCo { criterion_id: string; co_id: string; }
@@ -58,3 +60,10 @@ export interface ItemDateHistory { id: string; item_id: string; old_date: string
 export interface RubricLevel { label: string; min: number | null; max: number | null; text: string }
 export interface RubricCriterion { id: string; name: string; max: number; levels: RubricLevel[]; cos: string[] }
 export interface Rubric { id: string; offering_id: string; component_id: string | null; title: string; levels: string[]; criteria: RubricCriterion[]; note: string; sort: number; updated_at: string }
+
+// Attainment computed from an uploaded marksheet (0015): per-student results and the record of the last calculation. Raw marks are not stored.
+export interface StudentAttainment { offering_id: string; student_no: string; outcome_type: 'CO' | 'PO'; code: string; value: number | null }
+export interface SampleScript { assessment: string; max: number; mean: number | null; highest: { studentNo: string; total: number } | null;
+  average: { studentNo: string; total: number } | null; lowest: { studentNo: string; total: number } | null }
+export interface AttainmentRun { offering_id: string; file_name: string | null; students: number; columns: number;
+  thresholds: { studentCo: number; cohortCo: number; studentPo: number; cohortPo: number }; map_hash: string | null; warnings: string[]; samples: SampleScript[]; computed_at: string }

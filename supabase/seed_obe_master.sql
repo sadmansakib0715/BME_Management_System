@@ -2,12 +2,14 @@
 -- Source: SharePoint folder 'BME BUET OBE Documents' (read-only extraction, 2026-11-03T05:39:01.157Z); built 2026-11-03T05:45:39.327519+00:00.
 -- Run AFTER migrations/0013_obe_master.sql. Safe to run again: nothing a teacher has entered is overwritten.
 begin;
-create temp table stg_off (term_code text, term_name text, course_code text, student_batch text, contents text, objectives text, outline_text text, instructors jsonb, marks_distribution jsonb, components jsonb, source jsonb, issues text[], has_outline boolean, has_workbook boolean) on commit drop;
-create temp table stg_co (term_code text, course_code text, no int, statement text, domain_levels text[], delivery text[], tools text[], kpa text[], pos text[]) on commit drop;
-create temp table stg_crit (term_code text, course_code text, sort int, assessment text, label text, max_marks numeric, cos text[]) on commit drop;
-create temp table stg_att (term_code text, course_code text, outcome_type text, code text, value numeric, src text) on commit drop;
-create temp table stg_car (term_code text, course_code text, part_c text, part_d text, part_e text) on commit drop;
-create temp table stg_bugs (meeting_no text, held_on date, link text, term_code text, course_code text) on commit drop;
+drop view if exists public.v_stg_off;
+drop table if exists public.stg_off, public.stg_co, public.stg_crit, public.stg_att, public.stg_car, public.stg_bugs, public.stg_fresh, public.stg_nocrit cascade;
+create table public.stg_off (term_code text, term_name text, course_code text, student_batch text, contents text, objectives text, outline_text text, instructors jsonb, marks_distribution jsonb, components jsonb, source jsonb, issues text[], has_outline boolean, has_workbook boolean);
+create table public.stg_co (term_code text, course_code text, no int, statement text, domain_levels text[], delivery text[], tools text[], kpa text[], pos text[]);
+create table public.stg_crit (term_code text, course_code text, sort int, assessment text, label text, max_marks numeric, cos text[]);
+create table public.stg_att (term_code text, course_code text, outcome_type text, code text, value numeric, src text);
+create table public.stg_car (term_code text, course_code text, part_c text, part_d text, part_e text);
+create table public.stg_bugs (meeting_no text, held_on date, link text, term_code text, course_code text);
 insert into stg_off values ('2025-01','January 2025','BME 101',null,'Introduction to Biomedical Engineering and Careers in Biomedical Engineering; Human Biology: The central dogma of molecular biology, Brief introduction to cell biology, Introduction to human anatomy and physiology; Biomechanics: Introduction to biomechanics, Force, moments and couples system, Musculoskeletal systems, Methods of joints; Biomaterials and their interaction with tissue; Bioinstrumentation: Basic control system, Introduction to present-day medical instrumentations and measurements, Biosensors; Medical Imaging: X-ray, CT, Ultrasound, MRI, Nuclear imaging, Microscopy.','Understand the basic principles of engineering in medicine
 Demonstrate basic knowledge of human biology
 Analyze problems related to basic biomechanics, biomaterials, bioinstrumentation and medical imaging, and biosensors.','Bangladesh University of Engineering and Technology
@@ -5275,7 +5277,7 @@ insert into public.offerings (term_id, course_id, status)
 select t.id, c.id, 'archived' from stg_off s join public.terms t on t.code = s.term_code join public.courses c on c.code = s.course_code
 on conflict (term_id, course_id) do nothing;
 
-create or replace temp view v_stg_off as
+create or replace view public.v_stg_off as
   select s.*, o.id as offering_id from stg_off s join public.terms t on t.code = s.term_code join public.courses c on c.code = s.course_code
     join public.offerings o on o.term_id = t.id and o.course_id = c.id;
 
@@ -5290,7 +5292,7 @@ on conflict (offering_id) do update set outline_text = excluded.outline_text, in
   components = case when public.obe_offering_docs.components = '[]' then excluded.components else public.obe_offering_docs.components end;
 
 -- COs and their mapping, only into offerings that have none yet.
-create temp table stg_fresh on commit drop as
+create table public.stg_fresh as
   select v.offering_id from v_stg_off v where not exists (select 1 from public.course_outcomes x where x.offering_id = v.offering_id);
 insert into public.course_outcomes (offering_id, code, statement, domain, level, sort, domain_levels, delivery, tools, kpa)
 select v.offering_id, 'CO' || s.no, s.statement,
@@ -5307,7 +5309,7 @@ on conflict do nothing;
 
 -- Assessment map (question parts and rubric criteria with CO tags), only where the teachers have none yet.
 -- (Only where the COs came from the master copy too, so the CO tags line up.)
-create temp table stg_nocrit on commit drop as
+create table public.stg_nocrit as
   select v.offering_id from v_stg_off v where v.offering_id in (select offering_id from stg_fresh)
      and not exists (select 1 from public.obe_criteria x where x.offering_id = v.offering_id);
 insert into public.obe_criteria (offering_id, assessment, label, max_marks, sort)
@@ -5357,4 +5359,7 @@ from public.offerings o join public.terms t on t.id = o.term_id
 where public.obe_term_key(t) > (select max(term_code) from stg_off)
   and not exists (select 1 from public.course_outcomes x where x.offering_id = o.id);
 
+drop view if exists public.v_stg_off;
+drop table if exists public.stg_off, public.stg_co, public.stg_crit, public.stg_att, public.stg_car, public.stg_bugs, public.stg_fresh, public.stg_nocrit cascade;
 commit;
+notify pgrst, 'reload schema';
