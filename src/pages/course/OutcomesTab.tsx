@@ -39,6 +39,10 @@ export default function OutcomesTab(props: TabProps) {
       <SegTabs label="OBE section" value={section} onChange={setSection}
         options={[{ value: 'mapping', label: 'COs & mapping' }, { value: 'assessment', label: 'Assessment map' }, { value: 'rubrics', label: 'Rubrics' }, { value: 'attainment', label: 'Attainment' },
           { value: 'outline', label: 'Outline' }, { value: 'file', label: 'Course file' }, { value: 'car', label: 'CAR' }]} />
+      {obe.data.missing.length > 0 && <Callout tone="warn" title="The database needs the OBE update">
+        This project's database has no {obe.data.missing.join(', ')} table yet, so the assessment map, rubrics and outline cannot be shown or saved.
+        {isAdmin ? <> In Supabase → SQL Editor, run <span className="font-mono">supabase/update_obe_master.sql</span> (or only <span className="font-mono">supabase/update_obe_schema.sql</span> for the tables), then reload this page.</> : ' Ask the department admin to run the OBE update.'}
+      </Callout>}
       {carried && <Callout tone="info" title={`Carried forward from ${carried}`}>
         <div className="flex flex-wrap items-center gap-3"><span>The COs, mapping, assessment map, rubrics and outline start from {carried}. Revise what changed this term, then mark them reviewed.</span>
           {p.canEdit && <Button size="sm" loading={reviewed.isPending} onClick={() => reviewed.mutate(undefined, { onSuccess: () => toast('ok', 'Marked reviewed'), onError: (e) => toast('bad', e.message) })}>Mark reviewed</Button>}</div>

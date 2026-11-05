@@ -4,12 +4,13 @@ import { Button, Callout, Card, CardHeader, Dialog, Field, Input, Textarea, useT
 import { must, usePOs, useWrite } from '@/lib/api';
 import { fmtPct, mappedPos, parseAttainment, PO_CODES, valueOf } from '@/lib/obe';
 import { supabase } from '@/lib/supabase';
+import MarksheetCalc from './MarksheetCalc';
 import { PctBar, YesNo, type ObeProps } from './shared';
 
 type Values = Record<string, string>; // 'CO1' | 'PO5' → typed text
 
-/** Cohort CO% and PO% for this offering, imported from the course workbook or typed in. Y/N uses ≥ on the unrounded value. */
-export default function Attainment({ offering, course, obe, canEdit, isAdmin }: ObeProps) {
+/** Cohort CO% and PO% for this offering: calculated from an uploaded marksheet, or imported from the course workbook / typed in. Y/N uses ≥ on the unrounded value. */
+export default function Attainment({ offering, course, data, obe, canEdit, isAdmin }: ObeProps) {
   const toast = useToast();
   const pos = usePOs();
   const coT = Number(offering.cohort_threshold ?? 0.4), poT = Number(offering.po_threshold ?? 0.4);
@@ -38,8 +39,10 @@ export default function Attainment({ offering, course, obe, canEdit, isAdmin }: 
   const prevVal = (type: 'CO' | 'PO', code: string) => (prev ? valueOf(prev.attainment, type, code) : null);
   const missing = obe.cos.map((_, i) => `CO${i + 1}`).filter((c) => num(c) === null);
 
+  const computed = obe.attainment.some((a) => a.source === 'computed');
   return (
     <div className="space-y-5">
+      <MarksheetCalc offering={offering} course={course} obe={obe} canEdit={canEdit} isAdmin={isAdmin} data={data} />
       <Card>
         <CardHeader title="Thresholds" subtitle="A student attains a CO at the student threshold; the cohort attains it when that share of students do. Stored with this offering so past terms stay as they were." />
         <div className="p-4 flex flex-wrap items-end gap-3">
@@ -52,7 +55,7 @@ export default function Attainment({ offering, course, obe, canEdit, isAdmin }: 
       </Card>
 
       <Card>
-        <CardHeader title="CO attainment (cohort)" subtitle={`Share of students who reached ${Number(offering.co_threshold ?? 0.4) * 100}% on each CO. Attained at ≥ ${coT * 100}%.${prev ? ` Previous: ${prev.termName}.` : ''}`}
+        <CardHeader title="CO attainment (cohort)" subtitle={`Share of students who reached ${Number(offering.co_threshold ?? 0.4) * 100}% on each CO. Attained at ≥ ${coT * 100}%.${computed ? ' Calculated from the uploaded marksheet; editing a value here overrides it.' : ''}${prev ? ` Previous: ${prev.termName}.` : ''}`}
           actions={canEdit && <>
             <Button size="sm" icon={<ClipboardPaste className="size-4" aria-hidden />} onClick={() => setPaste('')}>Paste from workbook</Button>
             <Button size="sm" variant="primary" disabled={!dirty || bad.length > 0} loading={save.isPending}

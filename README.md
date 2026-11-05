@@ -45,7 +45,7 @@ tests/          unit tests (workflow, attainment, importer, dates)
 1. Create a project at supabase.com (free tier is enough to start).
 2. In **SQL Editor**, paste and run `supabase/setup.sql` (all migrations plus reference data in one file),
    then `supabase/seed_obe_master.sql` (the department's OBE data).
-   An **existing** project only needs `supabase/update_obe_master.sql` (migration 0013 plus the OBE data, safe to run again).
+   An **existing** project only needs `supabase/update_obe_master.sql` (migrations 0013–0015 plus the OBE data, safe to run again).
    Both data files are generated from the OBE master copy: `python3 -I scripts/build_obe_seed.py path/to/obe_master.json`.
    (Or with the CLI: `supabase link`, `supabase db push`, then run `seed.sql`.)
 3. **Authentication → Providers → Email:** enable. **Authentication → URL configuration:** set the Site URL to where the app is hosted.
@@ -102,6 +102,25 @@ select cron.schedule('bme-send-mail', '*/10 * * * *', $$select net.http_post(
 ```
 The database queues messages when a step unlocks, a paper is returned for correction, and 7/3/1/0 days before
 deadlines (then daily while overdue, up to five days).
+
+
+### OBE documents and attainment from marks (0015)
+
+| Step | Where | What the teacher gets |
+| --- | --- | --- |
+| Course outline | OBE → Outline | Contents, objectives, assessment strategy, distribution of marks, textbooks and lecture plan; **Outline PDF** in the department's outline layout (with COs, CO–PO and K/P/A tables) |
+| COs & mapping | OBE → COs & mapping | **CO-PO mapping PDF** laid out like CO-PO Mapping.docx |
+| Rubrics | OBE → Rubrics | **Rubric PDF** (Criterion & CO mapping · Max score · bands); **Add to assessment map** puts the criteria into the marksheet |
+| Marksheet | OBE → Attainment | **Marksheet template** (.xlsx) built from the assessment map and the roster: one column per question part or criterion, its COs and max marks |
+| Attainment | OBE → Attainment | **Upload marksheet** → checks (marks above max, duplicates, text, missing columns) → student CO% and PO%, cohort CO% and PO% (≥ 40% / ≥ 40%), highest/average/lowest scripts, **Results workbook** |
+| CAR | OBE → CAR | Part B filled from the results; **Draft from results** writes a first Part C/E; **CAR PDF** in the department's CAR layout |
+
+Marks are read in the browser and never stored: only per-student CO%/PO% (`obe_student_attainment`, visible to the course's
+teachers and admins), cohort results (`obe_attainment`, source `computed`) and the run record (`obe_attainment_runs`) are saved.
+`v_student_program_po` gives a student's program PO across BME 300/350/400 (BAETE step 2.2, pending BUGS approval).
+In the marksheet, `A` = absent (counts as 0) and `EX` = exempt (left out of that student's totals).
+
+**Existing databases:** run `supabase/migrations/0015_obe_computed.sql` once in the SQL Editor (or the regenerated `update_obe_master.sql`).
 
 ## Testing
 ```bash

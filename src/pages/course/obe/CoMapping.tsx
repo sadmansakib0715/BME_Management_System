@@ -1,4 +1,4 @@
-import { Copy, Plus, Trash2 } from 'lucide-react';
+import { Copy, FileDown, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Callout, Card, CardHeader, Empty, Field, SegTabs, Select, Textarea, useToast } from '@/components/ui';
 import { must, useBugs, usePOs, useWrite } from '@/lib/api';
@@ -6,14 +6,17 @@ import { coWarnings, CULMINATING_POS, DELIVERY, DOMAIN_LEVELS, KPA, TOOLS } from
 import { supabase } from '@/lib/supabase';
 import type { CourseOutcome } from '@/lib/types';
 import CoPoBoard from './CoPoBoard';
+import { coRows, poRefs, save as saveFile } from './docData';
 import { Chips, type ObeProps } from './shared';
+import { useCourseInfo } from './useDocInputs';
 
 type Draft = { id?: string; tmp?: string; statement: string; domain_levels: string[]; delivery: string[]; tools: string[]; kpa: string[]; pos: string[] };
 const DOMAIN_OF: Record<string, CourseOutcome['domain']> = { C: 'cognitive', PS: 'psychomotor', AF: 'affective' };
 
 /** COs and their mapping, laid out like CO-PO Mapping.docx: statements, then a CO × PO table, then CO × K/P/A. */
-export default function CoMapping({ offering, course, obe, canEdit, isAdmin }: ObeProps) {
+export default function CoMapping({ offering, course, data, obe, canEdit, isAdmin }: ObeProps) {
   const toast = useToast();
+  const info = useCourseInfo({ offering, course, data, obe });
   const pos = usePOs();
   const bugs = useBugs();
   const initial = useMemo<Draft[]>(() => obe.cos.map((c) => ({ id: c.id, statement: c.statement, domain_levels: c.domain_levels ?? [], delivery: c.delivery ?? [], tools: c.tools ?? [], kpa: c.kpa ?? [],
@@ -53,6 +56,13 @@ export default function CoMapping({ offering, course, obe, canEdit, isAdmin }: O
     cos.flatMap((c, i) => c.pos.map((po) => ({ co_id: c.id ?? c.tmp ?? String(i), po_code: po, strength: 1 as const }))), poList);
   const add = () => setCos((x) => [...x, { tmp: crypto.randomUUID(), statement: '', domain_levels: [], delivery: [], tools: [], kpa: [], pos: [] }]);
   const res = bugs.data?.find((b) => b.id === offering.co_resolution_id);
+  const downloadPdf = async () => {
+    const { mappingPdf } = await import('@/lib/pdf/obeDocs');
+    saveFile(mappingPdf({ course: info, cos: coRows(obe), pos: poRefs(poList), approval: res ? `BUGS meeting ${res.meeting_no}${res.held_on ? `, ${res.held_on}` : ''}` : null }),
+      `${course.code} CO-PO Mapping ${data.term.name}.pdf`);
+  };
+  const pdfButton = <Button size="sm" icon={<FileDown className="size-4" aria-hidden />} disabled={dirty || !obe.cos.length}
+    title={dirty ? 'Save first: the PDF uses the saved COs and mapping' : undefined} onClick={() => downloadPdf().catch((e) => toast('bad', e.message))}>CO-PO mapping PDF</Button>;
   const saveButton = <Button size="sm" variant="primary" disabled={!dirty || cos.some((c) => !c.statement.trim())} loading={save.isPending}
     onClick={() => save.mutate(cos, { onSuccess: () => toast('ok', 'COs and mapping saved'), onError: (e) => toast('bad', e.message) })}>Save</Button>;
 
@@ -60,10 +70,10 @@ export default function CoMapping({ offering, course, obe, canEdit, isAdmin }: O
     <div className="space-y-5">
       <Card>
         <CardHeader title="Course outcomes (COs)" subtitle="At most 12. Start each statement with an action verb. Pick one or more domain and taxonomy levels."
-          actions={canEdit && <>
+          actions={<>{pdfButton}{canEdit && <>
             {obe.prev && obe.prev.cos.length > 0 && cos.length === 0 && <Button size="sm" icon={<Copy className="size-4" aria-hidden />} onClick={fromPrev}>Copy from {obe.prev.termName}</Button>}
             <Button size="sm" icon={<Plus className="size-4" aria-hidden />} disabled={cos.length >= 12} onClick={add}>Add CO</Button>
-            {saveButton}</>} />
+            {saveButton}</>}</>} />
         {cos.length === 0 ? <Empty title="No COs yet">{obe.prev?.cos.length ? `Copy last term's ${obe.prev.cos.length} COs from ${obe.prev.termName}, then revise them.` : 'Add the COs approved for this course.'}</Empty> : (
           <ol className="divide-y divide-line">{cos.map((c, i) => (
             <li key={c.id ?? c.tmp} className="px-4 py-3 grid gap-3 md:grid-cols-[48px_1fr_auto]">

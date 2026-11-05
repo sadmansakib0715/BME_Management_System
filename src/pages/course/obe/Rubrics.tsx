@@ -1,19 +1,22 @@
 import { clsx } from 'clsx';
-import { ClipboardPaste, Copy, FileText, Plus, Trash2 } from 'lucide-react';
+import { ClipboardPaste, Copy, FileDown, FileText, ListPlus, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Callout, Card, CardHeader, Dialog, Empty, Textarea, useToast } from '@/components/ui';
 import { must, rpc, useWrite } from '@/lib/api';
 import { blankRubric, rubricChecks, rubricFromSheet, SAMPLE_RUBRIC, total, type RubricDraft } from '@/lib/rubric';
 import { supabase } from '@/lib/supabase';
-import type { Rubric } from '@/lib/types';
+import type { ObeCriterion, Rubric } from '@/lib/types';
 import { RubricEditor } from './RubricEditor';
+import { save as saveFile } from './docData';
 import type { ObeProps } from './shared';
+import { useCourseInfo } from './useDocInputs';
 
 const toDraft = (r: Rubric): RubricDraft => ({ id: r.id, title: r.title, component_id: r.component_id, levels: r.levels, criteria: r.criteria, note: r.note });
 
 /** The offering's rubrics. A teacher writes or pastes a rubric, then links each criterion to COs. */
-export default function Rubrics({ offering, data, obe, canEdit }: ObeProps) {
+export default function Rubrics({ offering, course, data, obe, canEdit }: ObeProps) {
   const toast = useToast();
+  const info = useCourseInfo({ offering, course, data, obe });
   const rubrics = obe.rubrics;
   const [openId, setOpenId] = useState<string | 'new' | null>(rubrics[0]?.id ?? null);
   const saved = useMemo(() => (openId && openId !== 'new' ? rubrics.find((x) => x.id === openId) : undefined), [openId, rubrics]);
@@ -37,6 +40,33 @@ export default function Rubrics({ offering, data, obe, canEdit }: ObeProps) {
   const del = useWrite((id: string) => must(supabase.from('rubrics').delete().eq('id', id)));
   const fill = useWrite(() => rpc.copyForward(offering.id));
   const start = (d: RubricDraft) => { setOpenId('new'); setDraft(d); };
+  const coCode = (id: string) => { const i = obe.cos.findIndex((c) => c.id === id); return i < 0 ? null : `CO${i + 1}`; };
+  const groupName = (r: Pick<Rubric, 'title' | 'component_id'>) => comps.find((c) => c.id === r.component_id)?.name ?? (r.title.trim() || 'Rubric');
+
+  const downloadPdf = async (r: Rubric) => {
+    const { rubricPdf } = await import('@/lib/pdf/obeDocs');
+    saveFile(rubricPdf({ course: info, rubric: { title: r.title, assessment: comps.find((c) => c.id === r.component_id)?.name ?? null, levels: r.levels, note: r.note,
+      criteria: r.criteria.map((c) => ({ name: c.name, max: Number(c.max), levels: c.levels, cos: c.cos.map(coCode).filter((x): x is string => !!x) })) } }),
+    `${course.code} Rubric ${r.title || 'untitled'} ${data.term.name}.pdf`);
+  };
+
+  /** Puts the rubric's criteria into the assessment map (one group named after its assessment), replacing that group, so the
+      marksheet template gets one column per criterion with its marks and COs. */
+  const toMap = useWrite(async (r: Rubric) => {
+    const name = groupName(r);
+    const valid = new Set(obe.cos.map((c) => c.id));
+    const old = obe.criteria.filter((c) => c.assessment === name).map((c) => c.id);
+    if (old.length) await must(supabase.from('obe_criteria').delete().in('id', old));
+    const base = Math.max(-1, ...obe.criteria.filter((c) => c.assessment !== name).map((c) => c.sort)) + 1;
+    const rows = r.criteria.filter((c) => c.name.trim() && Number(c.max) > 0)
+      .map((c, i) => ({ offering_id: offering.id, assessment: name, label: c.name.trim(), max_marks: Number(c.max), sort: base + i }));
+    if (!rows.length) return 0;
+    const saved = await must(supabase.from('obe_criteria').insert(rows).select()) as ObeCriterion[];
+    const crit = r.criteria.filter((c) => c.name.trim() && Number(c.max) > 0);
+    const links = saved.flatMap((row) => { const c = crit[row.sort - base]; return (c?.cos ?? []).filter((id) => valid.has(id)).map((co_id) => ({ criterion_id: row.id, co_id })); });
+    if (links.length) await must(supabase.from('obe_criterion_cos').insert(links));
+    return rows.length;
+  });
   const parsed = paste === null ? null : rubricFromSheet(paste);
 
   return (
@@ -65,7 +95,15 @@ export default function Rubrics({ offering, data, obe, canEdit }: ObeProps) {
 
       {draft && openId && <Card>
         <CardHeader title={draft.title || 'Untitled rubric'} subtitle={draft.component_id ? `Marks ${comps.find((c) => c.id === draft.component_id)?.name ?? 'an assessment'}` : 'Not linked to an assessment yet'}
-          actions={canEdit && <>
+          actions={!canEdit ? (saved && <Button size="sm" icon={<FileDown className="size-4" aria-hidden />} onClick={() => downloadPdf(saved).catch((e) => toast('bad', e.message))}>Rubric PDF</Button>) : <>
+            {saved && !dirty && <Button size="sm" icon={<FileDown className="size-4" aria-hidden />} onClick={() => downloadPdf(saved).catch((e) => toast('bad', e.message))}>Rubric PDF</Button>}
+            {saved && !dirty && <Button size="sm" icon={<ListPlus className="size-4" aria-hidden />} loading={toMap.isPending}
+              title="Adds one assessment-map row per criterion, so the marksheet template has a column for each"
+              onClick={() => {
+                const name = groupName(saved);
+                if (obe.criteria.some((c) => c.assessment === name) && !confirm(`The assessment map already has “${name}”. Replace its rows with this rubric's ${saved.criteria.length} criteria?`)) return;
+                toMap.mutate(saved, { onSuccess: (n) => toast('ok', `${n} criteria added to the assessment map as “${name}”`), onError: (e) => toast('bad', e.message) });
+              }}>Add to assessment map</Button>}
             {draft.id && <Button size="sm" variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} loading={del.isPending}
               onClick={() => confirm(`Delete “${draft.title || 'this rubric'}”?`) && del.mutate(draft.id!, { onSuccess: () => { toast('ok', 'Rubric deleted'); setOpenId(rubrics.find((x) => x.id !== draft.id)?.id ?? null); setDraft(null); }, onError: (e) => toast('bad', e.message) })}>Delete</Button>}
             {openId === 'new' && <Button size="sm" onClick={() => { setOpenId(rubrics[0]?.id ?? null); setDraft(rubrics[0] ? toDraft(rubrics[0]) : null); }}>Discard</Button>}
