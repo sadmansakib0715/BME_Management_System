@@ -5,15 +5,17 @@ import { useObeTerm, usePOs, type ObeTerm, type TermData } from '@/lib/api';
 import { CULMINATING_POS, DOMAIN_LEVELS, KPA, mappedPos } from '@/lib/obe';
 import { useTerm } from '@/lib/TermContext';
 import BugsCqi from './obe/BugsCqi';
+import CourseFolder from './obe/CourseFolder';
 import ObeCourses from './obe/ObeCourses';
 import ProgramPo from './obe/ProgramPo';
 
-/** OBE (spec sections 2, 8, 11, 14): course dashboard, program PO per batch, CO–PO coverage, BUGS & CQI, and the framework itself. */
+/** OBE (spec sections 2, 8, 11, 14): course dashboard, program PO per batch, CO–PO coverage, BUGS & CQI, the course folder generator, and the framework itself. */
 const TABS = [
   { key: 'courses', label: 'Courses' },
   { key: 'program', label: 'Program PO' },
   { key: 'coverage', label: 'Coverage' },
   { key: 'cqi', label: 'BUGS & CQI' },
+  { key: 'folder', label: 'Course folder' },
   { key: 'framework', label: 'Framework' },
 ];
 
@@ -39,6 +41,7 @@ export default function Outcomes() {
       {tab === 'program' && <ProgramPo />}
       {tab === 'coverage' && <Coverage data={data} obe={obe.data} />}
       {tab === 'cqi' && <BugsCqi />}
+      {tab === 'folder' && <CourseFolder />}
       {tab === 'framework' && <Framework />}
     </>
   );

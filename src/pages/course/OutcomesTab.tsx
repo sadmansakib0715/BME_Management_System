@@ -9,12 +9,13 @@ import Attainment from './obe/Attainment';
 import Car from './obe/Car';
 import CoMapping from './obe/CoMapping';
 import CourseFile from './obe/CourseFile';
+import CourseFolder from '../obe/CourseFolder';
 import Outline from './obe/Outline';
 import Rubrics from './obe/Rubrics';
 import type { TabProps } from './shared';
 
-type Section = 'mapping' | 'assessment' | 'rubrics' | 'attainment' | 'outline' | 'file' | 'car';
-const SECTIONS: Section[] = ['mapping', 'assessment', 'rubrics', 'attainment', 'outline', 'file', 'car'];
+type Section = 'mapping' | 'assessment' | 'rubrics' | 'attainment' | 'outline' | 'file' | 'car' | 'folder';
+const SECTIONS: Section[] = ['mapping', 'assessment', 'rubrics', 'attainment', 'outline', 'file', 'car', 'folder'];
 
 /** The course's OBE workspace: COs & mapping, the assessment map, rubrics, imported attainment, the outline, the course file and the CAR. */
 export default function OutcomesTab(props: TabProps) {
@@ -38,7 +39,7 @@ export default function OutcomesTab(props: TabProps) {
     <div className="space-y-5">
       <SegTabs label="OBE section" value={section} onChange={setSection}
         options={[{ value: 'mapping', label: 'COs & mapping' }, { value: 'assessment', label: 'Assessment map' }, { value: 'rubrics', label: 'Rubrics' }, { value: 'attainment', label: 'Attainment' },
-          { value: 'outline', label: 'Outline' }, { value: 'file', label: 'Course file' }, { value: 'car', label: 'CAR' }]} />
+          { value: 'outline', label: 'Outline' }, { value: 'file', label: 'Course file' }, { value: 'car', label: 'CAR' }, { value: 'folder', label: 'Course folder' }]} />
       {obe.data.missing.length > 0 && <Callout tone="warn" title="The database needs the OBE update">
         This project's database has no {obe.data.missing.join(', ')} table yet, so the assessment map, rubrics and outline cannot be shown or saved.
         {isAdmin ? <> In Supabase → SQL Editor, run <span className="font-mono">supabase/update_obe_master.sql</span> (or only <span className="font-mono">supabase/update_obe_schema.sql</span> for the tables), then reload this page.</> : ' Ask the department admin to run the OBE update.'}
@@ -54,6 +55,7 @@ export default function OutcomesTab(props: TabProps) {
       {section === 'attainment' && <Attainment {...p} />}
       {section === 'file' && <CourseFile {...p} />}
       {section === 'car' && <Car {...p} />}
+      {section === 'folder' && <CourseFolder courseCode={props.course.code} />}
     </div>
   );
 }
