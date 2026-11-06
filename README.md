@@ -131,9 +131,11 @@ problems, A1 for POs on complex engineering activities (`impliedKpa` in `src/lib
 
 **OBE → Course folder** (also on each course: OBE → *Course folder*) builds the department course file in the browser:
 
-1. Upload the **course outline** (.docx). Both layouts are read: the department's own outline (header fields, Course Teacher(s) table with the
-   class routine, COs as a numbered list, `Assessment:` lines such as “Lab Quiz 30%”) and the website outline template (CO table, Distribution of
-   Marks). When the outline has no CO table, also upload the department's **CO-PO Mapping.docx** for each CO's POs and Assessment Tool(s); on a
+1. Upload the **course outline** (.docx) in the department's layout (as BME 310): header fields (as lines or a table), Course Teacher(s)
+   table with the class routine, COs as a numbered list, `Assessment:` lines such as “Lab test (x2): 40%” (the (x2) sets how many were taken),
+   Weekly Schedule (Week | Topics | Evaluation Basis), Prepared by. **Outline template (.docx)** on the page is a blank outline in this layout
+   (`src/assets/course-folder/course_outline_template.docx`); the uploaded outline goes into the course folder as it is. The website's earlier
+   outline format (CO table, Distribution of Marks) is still read. When the outline has no CO table, also upload the department's **CO-PO Mapping.docx** for each CO's POs and Assessment Tool(s); on a
    course's page the website's own COs and mapping fill in otherwise. **course_information.xlsx** is optional (sheets `info`, `faculties`,
    `routine`, `sections`): it is checked against the outline (course no, credit hours, level/term, session; the outline's credit hours win). Without
    it, type the term, batch, number of students and missing rolls.
@@ -148,7 +150,8 @@ problems, A1 for POs on complex engineering activities (`impliedKpa` in `src/lib
    `<course> (<semester>).zip`: the course outline, **CO-PO Mapping**, **Instructors and Schedule**, **CAR** (parts A–B filled, C–E as yellow
    placeholders with a drafted attainment comment), a **CO-PO Attainment Report**, the BUGS resolution link, the **CO-PO assessment marks
    workbook** with live formulas, one folder per assessment with *Sample scripts to upload.txt* (highest, average = closest to the mean, lowest),
-   and the Lecture Materials folders, plus `_generation_log.txt` with every warning.
+   and the Lecture Materials folders. An assessment taken more than once (the × box beside it, e.g. 3 lab tests) gets numbered folders:
+   *Lab Test 01*, *Lab Test 02*, *Lab Test 03*; the number changes nothing else.
 
 Rules: student CO% = marks on the CO's items ÷ their maximum, attained at ≥ 40%; cohort ≥ 40% of students; student PO% = mean of the CO% of the
 COs mapped to it. `Abs`/`Absent`: absent in every item of a CO leaves the student out of that CO, absent in some counts as 0. The Word documents

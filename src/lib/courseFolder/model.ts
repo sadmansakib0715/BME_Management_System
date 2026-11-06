@@ -39,7 +39,8 @@ export interface Outline {
   kpaTable: unknown | null;  // the K/P/A matrix element, copied into CO-PO Mapping.docx
   planHeader: string[];
   plan: string[][];
-  distribution: { name: string; pct: number }[];
+  /** Assessment lines: "Lab test (x2): 40%" → { name: 'Lab test', pct: 40, count: 2 }. */
+  distribution: { name: string; pct: number; count?: number }[];
   textbooks: string[];
   /** The department outline's header block: Course No, Title, Credit / Contact hours, Level/Term, Academic Session. */
   header: { courseNo?: string; title?: string; credit?: string; contact?: string; level?: string; term?: string; session?: string };

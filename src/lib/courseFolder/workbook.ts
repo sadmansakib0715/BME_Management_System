@@ -6,7 +6,7 @@ import {
   clean, COHORT_THRESHOLD, fmtNum, isAbsentToken, key, levelTerm, MAX_PO, parseNums, STUDENT_THRESHOLD, studentIds, toId, toMark,
   type Attainment, type CourseInfo, type Item, type Marks, type Outline, Warnings,
 } from './model';
-import { planColumns, planFromOutline, theoryWeights, type Plan } from './plan';
+import { planColumns, planCounts, planFromOutline, theoryWeights, type Plan } from './plan';
 
 export const MAP = 'Assessment-CO Mapping';
 export const COM = 'CO Marks';
@@ -140,8 +140,17 @@ export async function marksTemplate(info: CourseInfo, o: Outline, w: Warnings, p
   ws.getCell(`${g}2`).value = 'Enter marks in the yellow cells. Type Abs for an absent student.';
   ws.getCell(`${g}3`).value = 'Do not change rows 1-4 or the Student ID column.';
   ws.getColumn(items.length + 4).width = 60;
-  meta(wb, { course_no: info.courseNo, semester: info.semester, kind: 'columns', layout: 'columns-ca-v1' });
+  meta(wb, { course_no: info.courseNo, semester: info.semester, kind: 'columns', layout: 'columns-ca-v1', counts: JSON.stringify(planCounts(plan)) });
   return save(wb);
+}
+
+/** Assessment name → how many were taken, as saved in the marks sheet's hidden _meta sheet ({} for older sheets). */
+export function readCounts(wb: ExcelJS.Workbook): Record<string, number> {
+  const m = wb.getWorksheet('_meta');
+  if (m) for (let r = 1; r <= m.rowCount; r++) if (clean(plain(m.getCell(r, 1).value)) === 'counts') {
+    try { return JSON.parse(String(plain(m.getCell(r, 2).value) ?? '{}')); } catch { return {}; }
+  }
+  return {};
 }
 
 function meta(wb: ExcelJS.Workbook, m: Record<string, string | number>) {

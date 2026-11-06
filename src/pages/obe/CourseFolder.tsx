@@ -4,7 +4,7 @@ import { Badge, Button, Callout, Card, CardHeader, Field, Input, Spinner, useToa
 import { DEPT_CODE, parseMissing, studentIds as rollIds } from '@/lib/attainment';
 import type { BuildResult, RollInput, Sources } from '@/lib/courseFolder/build';
 import { batchOf, isSessional, type CO, type CourseInfo, type Outline } from '@/lib/courseFolder/model';
-import { checkPlan, type Plan } from '@/lib/courseFolder/plan';
+import { checkPlan, planCounts, type Plan } from '@/lib/courseFolder/plan';
 import { AssessmentTree } from './AssessmentTree';
 import carUrl from '@/assets/course-folder/car.docx?url';
 import coPoUrl from '@/assets/course-folder/co_po_mapping.docx?url';
@@ -147,7 +147,7 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
       const { buildCourseFolder } = await lib();
       const [car, coPoMapping, instructors] = await Promise.all([fetchBytes(carUrl), fetchBytes(coPoUrl), fetchBytes(instructorsUrl)]);
       const r = await buildCourseFolder({ ...(await sources()), marks: await marks.arrayBuffer(),
-        previous: previous ? await previous.arrayBuffer() : null, templates: { car, coPoMapping, instructors } });
+        previous: previous ? await previous.arrayBuffer() : null, templates: { car, coPoMapping, instructors }, counts: plan && plan.layout === 'columns' ? planCounts(plan) : undefined });
       setResult(r);
       save(r.zip, r.fileName, 'application/zip');
       toast('ok', `${r.fileName} downloaded`);

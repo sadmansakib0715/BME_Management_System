@@ -3,13 +3,15 @@ import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { buildCourseFolder, buildMarksTemplate, previewSources } from '../src/lib/courseFolder/build';
+import { readOutline, splitCount } from '../src/lib/courseFolder/inputs';
 import { websiteMappingDocx } from '../src/lib/courseFolder/docs';
 import { checkPlan, cosFor, planColumns, type Plan } from '../src/lib/courseFolder/plan';
 import { batchOf, computeAttainment, key, norm, parseNums, sampleStats, studentIds, Warnings, type CourseInfo, type Outline } from '../src/lib/courseFolder/model';
 
 // Fictional course data only. The outline is the website's outline template (BME 320, three COs → PO6, PO5, PO10).
 const A = 'src/assets/course-folder';
-const outline = readFileSync(`${A}/course_outline_template.docx`);
+// The website's earlier outline format (fictional BME 320: CO table, Distribution of Marks): still read.
+const outline = readFileSync('tests/fixtures/outline_website_format.docx');
 const templates = { car: readFileSync(`${A}/car.docx`), coPoMapping: readFileSync(`${A}/co_po_mapping.docx`), instructors: readFileSync(`${A}/instructors_and_schedule.docx`) };
 
 async function infoXlsx(info: Record<string, string | number>, sections: (string | number)[][]) {
@@ -218,6 +220,50 @@ describe("the department's outline layout", () => {
     for (let r = 5; r <= ws.rowCount; r++) if (ws.getCell(`A${r}`).value) ids.push(ws.getCell(`A${r}`).value);
     expect(ids.length).toBe(49);
     expect([ids[0], ids[ids.length - 1], ids.includes(2118007)]).toEqual([2118001, 2118050, false]);
+  });
+
+  it('makes numbered folders for an assessment taken several times, and no generation log', async () => {
+    const src = { outline: await deptOutline(), mapping: await deptMapping(), roll: { semester: 'July 2025', batch: '21', count: 2, missingIds: [] } };
+    const { plan } = await previewSources(src);
+    expect(plan.items.map((i) => i.count)).toEqual([1, 1, 1]);
+    plan.items[0].count = 3;   // three quizzes were taken; marks are unchanged
+    const t = await buildMarksTemplate(src, plan);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(t.bytes as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet('ca')!;
+    expect([2, 3, 4].map((c) => ws.getCell(3, c).value)).toEqual([30, 45, 75]);
+    [[15, 45, 75], [12, 9, 15]].forEach((row, i) => row.forEach((v, k) => (ws.getCell(5 + i, 2 + k).value = v)));
+    const marks = new Uint8Array(await wb.xlsx.writeBuffer());
+    const names = async (counts?: Record<string, number>) => Object.keys((await JSZip.loadAsync((await buildCourseFolder({ ...src, marks, templates, counts })).zip)).files);
+    const files = await names();   // the count saved in the marks sheet
+    for (const f of ['Quiz 01/', 'Quiz 02/', 'Quiz 03/']) expect(files.some((x) => x.endsWith(`/Assessments and scripts/${f}Sample scripts to upload.txt`)), f).toBe(true);
+    expect(files.some((x) => x.endsWith('/Assessments and scripts/Quiz/'))).toBe(false);
+    expect(files.some((x) => x.endsWith('/Assessments and scripts/Project/Sample scripts to upload.txt'))).toBe(true);
+    expect(files.some((x) => x.includes('_generation_log'))).toBe(false);
+    const changed = await names({ Quiz: 1, Project: 2 });   // as changed on the page after the download
+    expect(['Quiz/', 'Project 01/', 'Project 02/'].every((f) => changed.some((x) => x.endsWith(`/Assessments and scripts/${f}Sample scripts to upload.txt`)))).toBe(true);
+  }, 30000);
+
+  it('reads "Lab test (x2): 40%" as one assessment taken twice, and a header block written as a table', async () => {
+    expect(['Lab test (x2)', 'Lab Tests (×3)', 'Quiz x4', 'Max 10', 'Project'].map(splitCount)).toEqual([
+      { name: 'Lab test', count: 2 }, { name: 'Lab Tests', count: 3 }, { name: 'Quiz', count: 4 }, { name: 'Max 10', count: 1 }, { name: 'Project', count: 1 }]);
+    const doc = await docx([
+      TBL([['Course No:', 'BME 998'], ['Course Title:', 'Protocols Sessional'], ['Credit hours:', '1.5', 'Contact hours:', '3'], ['Level/Term:', '3/1'], ['Academic Session:', '2023-2024']]),
+      P('Course Outcomes:'), P('Apply the protocols'), P('Inspect the findings'),
+      P('Assessment:'), P('Class participation:\t10%'), P('Continuous assessment:\t20%'), P('Lab test (x2):\t40%'), P('Project:\t30%'),
+    ].join(''));
+    const p = await previewSources({ outline: doc, roll: { semester: 'January 2025', batch: '21', count: 3, missingIds: [] } });
+    expect(p.info).toMatchObject({ courseNo: 'BME 998', credit: 1.5, contactHours: '3', level: '3', term: '1', session: '2023-2024' });
+    expect(p.plan.items.map((i) => [i.name, i.pct, i.marks, i.count])).toEqual([['Class participation', 10, 15, 1], ['Continuous assessment', 20, 30, 1], ['Lab test', 40, 60, 2], ['Project', 30, 45, 1]]);
+  });
+
+  it("reads the website's outline template (the department layout)", async () => {
+    const o = await readOutline(readFileSync(`${A}/course_outline_template.docx`));
+    expect(o.cos.length).toBe(3);
+    expect(o.distribution).toEqual([{ name: 'Class participation', pct: 10, count: 1 }, { name: 'Continuous assessment', pct: 20, count: 1 }, { name: 'Lab test', pct: 40, count: 2 }, { name: 'Project', pct: 30, count: 1 }]);
+    expect(o.teachers.length).toBe(3);
+    expect(o.planHeader).toEqual(['Week', 'Topics', 'Evaluation Basis']);
+    expect(o.textbooks.length).toBe(2);
   });
 
   it('matches assessment names to CO assessment tools without false hits', async () => {

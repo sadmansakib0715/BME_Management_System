@@ -4,11 +4,11 @@ import JSZip from 'jszip';
 import { carDocx, coPoMappingDocx, instructorsDocx, reportDocx } from './docs';
 import { checkInfo, infoFromOutline, loadWorkbook, mergeMapping, mergeSiteCos, readCourseInfo, readOutline } from './inputs';
 import {
-  clean, computeAttainment, fmtNum, fmtPct, initials, isSessional, safeName, sampleStats, studentIds,
+  clean, computeAttainment, fmtNum, initials, isSessional, safeName, sampleStats, studentIds,
   type Attainment, type CO, type CourseInfo, type Marks, type Outline, type Sample, Warnings,
 } from './model';
-import { planFromOutline, type Plan } from './plan';
-import { courseWorkbook, marksTemplate, readPrevious, readSessionalMarks, readTheoryWorkbook, sessionalInputs } from './workbook';
+import { numberedFolders, planFromOutline, type Plan } from './plan';
+import { courseWorkbook, marksTemplate, readCounts, readPrevious, readSessionalMarks, readTheoryWorkbook, sessionalInputs } from './workbook';
 
 export type Bytes = ArrayBuffer | Uint8Array;
 export interface Templates { car: Bytes; coPoMapping: Bytes; instructors: Bytes }
@@ -74,7 +74,8 @@ export async function buildMarksTemplate(s: Sources, plan?: Plan) {
 }
 
 /** Stage 2: the course folder. */
-export async function buildCourseFolder(a: Sources & { marks: Bytes; previous?: Bytes | null; templates: Templates }): Promise<BuildResult> {
+/** `counts`: how many of each assessment were taken (from the page); otherwise as saved in the marks sheet. Folders only. */
+export async function buildCourseFolder(a: Sources & { marks: Bytes; previous?: Bytes | null; templates: Templates; counts?: Record<string, number> }): Promise<BuildResult> {
   const w = new Warnings();
   const { info, outline } = await readSources(a, w);
   const cno = info.courseNo;
@@ -115,23 +116,22 @@ export async function buildCourseFolder(a: Sources & { marks: Bytes; previous?: 
   else dir.file('BUGS Resolution - add link.txt', "Paste the BUGS resolution link for this course (or add 'bugs_resolution_link' to course_information.xlsx).\n");
 
   asm.file(`${cno}-CO-PO-Assessment-marks.xlsx`, await courseWorkbook(info, outline, marks.ids, spec, data, false, att));
+  const counts = { ...readCounts(book), ...(a.counts ?? {}) };
   for (const { folder, name, max, s } of samples) {
-    const lines = [`${cno} - ${name} (out of ${fmtNum(max)})`, '', 'Upload into this folder:', '  - the question / task sheet',
-      '  - scanned scripts of the three students below, named Highest.pdf, Average.pdf, Lowest.pdf', '',
-      ...(['highest', 'average', 'lowest'] as const).map((k) => `  ${(k[0].toUpperCase() + k.slice(1)).padEnd(8)}: ${s[k] ? `${s[k]![0]}  (${fmtNum(s[k]![1])})` : '-'}`),
-      ...(s.mean === null ? [] : ['', `Class mean: ${s.mean.toFixed(2)}. 'Average' = the student closest to the mean.`])];
-    asm.folder(safeName(folder))!.file('Sample scripts to upload.txt', `${lines.join('\n')}\n`);
+    const sub = numberedFolders(folder, counts[name] ?? counts[folder] ?? 1);
+    sub.forEach((f) => {
+      const lines = [`${cno} - ${f} (${sub.length > 1 ? `marks sheet: ${name}, ` : ''}out of ${fmtNum(max)})`, '', 'Upload into this folder:', '  - the question / task sheet',
+        '  - scanned scripts of the three students below, named Highest.pdf, Average.pdf, Lowest.pdf', '',
+        ...(sub.length > 1 ? [`  (The students are picked from the marks entered for ${name}.)`, ''] : []),
+        ...(['highest', 'average', 'lowest'] as const).map((k) => `  ${(k[0].toUpperCase() + k.slice(1)).padEnd(8)}: ${s[k] ? `${s[k]![0]}  (${fmtNum(s[k]![1])})` : '-'}`),
+        ...(s.mean === null ? [] : ['', `Class mean: ${s.mean.toFixed(2)}. 'Average' = the student closest to the mean.`])];
+      asm.folder(safeName(f))!.file('Sample scripts to upload.txt', `${lines.join('\n')}\n`);
+    });
   }
   if (isSessional(info)) {
     const label = /lab|exp/i.test(outline.planHeader.join(' ')) ? 'Lab' : 'Week';
     outline.plan.forEach((_, k) => lec.folder(`${label} - ${String(k + 1).padStart(2, '0')}`));
   } else for (const sub of ['Book', 'Note', ...info.faculties.map((f) => initials(clean(f.name)))]) lec.folder(sub);
-
-  dir.file('_generation_log.txt', [
-    `Generated ${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC`, `Students: ${marks.ids.length}`,
-    `CO cohort: ${att.coUsed.map((c) => `CO${c}=${fmtPct(att.co.get(c)!.pct)}`).join(', ')}`,
-    `PO cohort: ${att.poUsed.map((p) => `PO${p}=${fmtPct(att.po.get(p)!.pct)}`).join(', ')}`, '', 'Warnings:',
-    ...(w.list.length ? w.list.map((x) => `  - ${x}`) : ['  none'])].join('\n') + '\n');
 
   const files = Object.keys(zip.files).sort();
   return { zip: await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }), fileName: `${root}.zip`, info, outline, attainment: att,

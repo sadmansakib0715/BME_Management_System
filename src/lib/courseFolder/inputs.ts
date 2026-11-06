@@ -71,6 +71,14 @@ const SECTION_KEYS: [string, RegExp][] = [
   ['textbooks', /^(text\s*books?|references)/i], ['prepared', /^prepared\s+by/i],
 ];
 
+/** "Lab test (x2)" / "Lab Tests (×2)" / "Quiz x3" → name and how many were taken. */
+export function splitCount(raw: string): { name: string; count: number } {
+  const m = raw.match(/^(.*?)(?:\s*\(\s*[x×]\s*(\d{1,2})\s*\)|\s+[x×]\s*(\d{1,2}))\s*$/i);
+  if (!m || !m[1].trim()) return { name: raw.replace(/[:\-–]+$/, '').trim(), count: 1 };
+  return { name: m[1].replace(/[:\-–]+$/, '').trim(), count: Math.max(1, Number(m[2] ?? m[3])) };
+}
+const distItem = (rawName: string, pct: number) => ({ ...splitCount(clean(rawName).replace(/[:\-–]+$/, '').trim()), pct });
+
 const EMAIL = /[\w.+-]+@[\w-]+(\.[\w-]+)+/;
 const PHONE = /\+?\d[\d\s-]{8,}\d/;
 /** "Saturday (A1):02:00 PM-05:00 PM Tuesday (A2): …" → routine rows (section, day, start_time, end_time). */
@@ -125,11 +133,12 @@ export async function readOutline(data: ArrayBuffer | Uint8Array, opts: { requir
       }
       if (current === 'distribution') {
         const d = raw.trim().match(/^(.*?)[\s\t:]+(\d+(?:\.\d+)?)\s*%/);
-        if (d && clean(d[1]) && !/^total\b/i.test(d[1].trim())) o.distribution.push({ name: clean(d[1]).replace(/[:\-–]+$/, '').trim(), pct: Number(d[2]) });
+        if (d && clean(d[1]) && !/^total\b/i.test(d[1].trim())) o.distribution.push(distItem(d[1], Number(d[2])));
       } else if (current === 'textbooks') o.textbooks.push(txt);
       else if (current === 'outcomes' && !/:\s*$/.test(txt)) listCos.push(txt.replace(/^(CO\s*-?\s*\d+|\d+)\s*[.):-]\s*/i, ''));
     } else {
       const rows = kids(el, 'tr').map((tr) => kids(tr, 'tc').map((tc) => clean(cellText(tc).replace(/\n/g, ' / '))));
+      for (const r of kids(el, 'tr')) readHeaderLine(kids(r, 'tc').map((tc) => cellText(tc).replace(/\n/g, ' ')).join('\t'), o.header);
       const rawRows = kids(el, 'tr').map((tr) => kids(tr, 'tc').map((tc) => cellText(tc)));
       if (!rows.length) continue;
       const hdr = rows[0].map((h) => h.toLowerCase());
@@ -149,7 +158,7 @@ export async function readOutline(data: ArrayBuffer | Uint8Array, opts: { requir
       } else if (current === 'distribution') {
         for (const c of rows.slice(1)) {
           const pct = c.slice(1).find((x) => /\d/.test(x))?.match(/(\d+(?:\.\d+)?)/);
-          if (pct && c[0] && !/^total/i.test(c[0])) o.distribution.push({ name: c[0], pct: Number(pct[1]) });
+          if (pct && c[0] && !/^total/i.test(c[0])) o.distribution.push(distItem(c[0], Number(pct[1])));
         }
       } else if ((current === 'plan' || /week|lecture|experiment|lab/.test(joined)) && !o.plan.length && current !== 'prepared') {
         o.planHeader = rows[0];

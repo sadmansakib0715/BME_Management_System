@@ -6,7 +6,9 @@ import { fmtNum, isSessional, norm, type CourseInfo, type Item, type Outline, Wa
 export type AssessmentKind = 'attendance' | 'ct' | 'final' | 'other';
 /** One assessment = one column of the marks sheet: its weight, its marks and every CO it assesses. An assessment that covers
     two COs stays one column; its marks count towards each of those COs. */
-export interface PlanItem { name: string; pct: number; kind: AssessmentKind; cos: number[]; marks: number }
+export interface PlanItem { name: string; pct: number; kind: AssessmentKind; cos: number[]; marks: number;
+  /** How many were taken (e.g. 3 lab tests). Marks are unaffected; the course folder gets that many folders: Lab Test 01, 02, 03. */
+  count?: number }
 /** `theory` = the department's theory workbook (attendance, best-of class tests, term final by question);
     `columns` = one column per assessment. */
 export interface Plan { total: number; layout: 'theory' | 'columns'; items: PlanItem[] }
@@ -47,10 +49,10 @@ export function cosFor(o: Outline, assessment: string): number[] {
 export function planFromOutline(info: CourseInfo, o: Outline, w: Warnings = new Warnings()): Plan {
   const total = round2(info.credit * 100);
   if (!o.distribution.length) w.add("the outline has no 'Assessment' / 'Distribution of Marks' lines; add the assessments below");
-  const items: PlanItem[] = o.distribution.map(({ name, pct }) => {
+  const items: PlanItem[] = o.distribution.map(({ name, pct, count }) => {
     const kind = kindOf(name);
     const cos = cosFor(o, name);
-    return { name, pct, kind, cos, marks: round2((total * pct) / 100) };
+    return { name, pct, kind, cos, marks: round2((total * pct) / 100), count: count ?? 1 };
   });
   return { total, items, layout: defaultLayout(info, items) };
 }
@@ -82,6 +84,13 @@ export function checkPlan(p: Plan, o: Outline): { errors: string[]; warnings: st
 export function planColumns(p: Plan): Item[] {
   return p.items.map((it) => ({ name: it.name, cos: [...it.cos].sort((a, b) => a - b), max: it.marks }));
 }
+
+/** Assessment name → how many were taken, for the assessment folders. */
+export const planCounts = (p: Plan): Record<string, number> => Object.fromEntries(p.items.filter((i) => i.name.trim()).map((i) => [i.name.trim(), Math.max(1, Math.floor(i.count ?? 1))]));
+
+/** Folder names for an assessment taken `count` times: "Lab Test" once, else "Lab Test 01", "Lab Test 02", … */
+export const numberedFolders = (name: string, count = 1): string[] =>
+  count > 1 ? Array.from({ length: count }, (_, i) => `${name} ${String(i + 1).padStart(2, '0')}`) : [name];
 
 /** Weights for the theory workbook: attendance %, class-test %, term-final %, and the COs the class tests assess. */
 export function theoryWeights(p: Plan): { att: number; ca: number; tf: number; ctCos: number[] } {

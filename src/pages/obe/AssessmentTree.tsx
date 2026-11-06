@@ -17,7 +17,7 @@ export function AssessmentTree({ plan, onChange, cos, courseLabel, sessional, di
     setItem(k, { ...it, cos: it.cos.includes(co) ? it.cos.filter((c) => c !== co) : [...it.cos, co].sort((a, b) => a - b) });
   };
   const setPct = (k: number, pct: number) => setItem(k, { ...plan.items[k], pct, marks: r2((plan.total * pct) / 100) });
-  const add = () => onChange({ ...plan, items: [...plan.items, { name: '', pct: 0, kind: 'other', cos: [], marks: 0 }] });
+  const add = () => onChange({ ...plan, items: [...plan.items, { name: '', pct: 0, kind: 'other', cos: [], marks: 0, count: 1 }] });
   const remove = (k: number) => onChange({ ...plan, items: plan.items.filter((_, j) => j !== k) });
   const pct = plan.items.reduce((a, i) => a + i.pct, 0), marks = plan.items.reduce((a, i) => a + i.marks, 0);
   const theoryOk = canUseTheory(plan.items);
@@ -48,6 +48,11 @@ export function AssessmentTree({ plan, onChange, cos, courseLabel, sessional, di
                 <div className="flex items-center gap-1"><Input id={`tree-pct-${k}`} type="number" min={0} max={100} step="any" className="h-8 w-20 text-right" disabled={disabled}
                   value={it.pct} onChange={(e) => setPct(k, Number(e.target.value) || 0)} /><span className="text-2xs text-muted">%</span></div>
                 <span className="text-2xs text-muted tabular w-20 text-right">{fmt(it.marks)} marks</span>
+                {plan.layout === 'columns' && <div className="flex items-center gap-1" title="How many were taken, e.g. 3 lab tests. Only the course folder uses it: Lab Test 01, 02, 03.">
+                  <label htmlFor={`tree-count-${k}`} className="text-2xs text-muted">×</label>
+                  <Input id={`tree-count-${k}`} type="number" min={1} max={30} step={1} className="h-8 w-16 text-right" disabled={disabled} aria-label={`How many ${it.name || 'assessments'} were taken`}
+                    value={it.count ?? 1} onChange={(e) => setItem(k, { ...it, count: Math.min(30, Math.max(1, Math.floor(Number(e.target.value) || 1))) })} />
+                </div>}
                 {!disabled && <button type="button" className="size-8 grid place-items-center rounded text-muted hover:text-bad hover:bg-sunken cursor-pointer" aria-label={`Remove ${it.name || 'assessment'}`} onClick={() => remove(k)}><Trash2 className="size-4" aria-hidden /></button>}
               </div>
               <div className="pl-5 flex flex-wrap items-center gap-1.5" role="group" aria-label={`COs assessed by ${it.name || 'this assessment'}`}>
