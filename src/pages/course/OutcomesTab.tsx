@@ -55,7 +55,9 @@ export default function OutcomesTab(props: TabProps) {
       {section === 'attainment' && <Attainment {...p} />}
       {section === 'file' && <CourseFile {...p} />}
       {section === 'car' && <Car {...p} />}
-      {section === 'folder' && <CourseFolder courseCode={props.course.code} />}
+      {section === 'folder' && <CourseFolder courseCode={props.course.code} termName={props.data.term.name}
+        siteCos={obe.data.cos.map((c, i) => ({ no: i + 1, statement: c.statement, pos: obe.data!.coPo.filter((m) => m.co_id === c.id).map((m) => Number(m.po_code.slice(2))).sort((x, y) => x - y),
+          domain: (c.domain_levels ?? []).join(', '), delivery: (c.delivery ?? []).join(', '), tools: (c.tools ?? []).join(', ') }))} />}
     </div>
   );
 }

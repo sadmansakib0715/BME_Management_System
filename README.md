@@ -129,15 +129,21 @@ problems, A1 for POs on complex engineering activities (`impliedKpa` in `src/lib
 
 ### Course folder generator (no database changes)
 
-**OBE → Course folder** (also on each course: OBE → *Course folder*) builds the department course file from three files, in the browser:
+**OBE → Course folder** (also on each course: OBE → *Course folder*) builds the department course file in the browser:
 
-1. The faculty fills **course_information.xlsx** (sheets `info`, `faculties`, `routine` and **`sections`**: `section, first_roll, last_roll,
-   extra_ids, exclude_ids`; a blank one with notes can be downloaded on the page) and the **course outline** (.docx, the website outline format:
-   CO table, K/P/A table, distribution of marks, textbooks, lecture plan).
-2. **Download marks sheet**: student IDs are filled from the sections (batch + 18 + roll; batch = session start year − (level − 1), or the `batch` column).
-   Theory courses (odd course number, or `course_type`) get the BME 211 workbook: Attendance Summary, CA Marks (best *k* of *n* CTs), TF Marks,
-   **Assessment-CO Mapping** (marks and CO of each Q1/Q5 sub-part; CTs only if ticked), CO Marks, Individual and Cohort Attainment.
-   Sessional courses get one `ca` sheet: a column per assessment in the distribution of marks, its CO from the CO table's assessment tools.
+1. Upload the **course outline** (.docx). Both layouts are read: the department's own outline (header fields, Course Teacher(s) table with the
+   class routine, COs as a numbered list, `Assessment:` lines such as “Lab Quiz 30%”) and the website outline template (CO table, Distribution of
+   Marks). When the outline has no CO table, also upload the department's **CO-PO Mapping.docx** for each CO's POs and Assessment Tool(s); on a
+   course's page the website's own COs and mapping fill in otherwise. **course_information.xlsx** is optional (sheets `info`, `faculties`,
+   `routine`, `sections`): it is checked against the outline (course no, credit hours, level/term, session; the outline's credit hours win). Without
+   it, type the term, batch, number of students and missing rolls.
+2. Beside the uploads the page shows what was read (course details, teachers, COs with their POs and tools) and the **assessment tree**: each
+   assessment from the outline with its weight, its marks (credit hours × 100 × weight) and the COs whose Assessment Tool(s) name it. It can be
+   edited: rename, change a weight, tick COs, change how an assessment covering several COs is split, add or remove assessments.
+   **Download marks sheet** builds the sheet from the tree: one `ca` sheet with a column per assessment (per CO when it covers several), its CO
+   and marks, and the student IDs. Theory courses assessed only by attendance, class tests and the term final can instead use the BME 211 workbook
+   (Attendance Summary, CA Marks with best *k* of *n* CTs, TF Marks, Assessment-CO Mapping for the Q1/Q5 sub-parts, CO Marks, attainment sheets),
+   with the weights from the tree. No sheet has Position columns.
 3. Upload the filled sheet (and optionally last term's generated workbook for the CAR's previous-term table) → **Build course folder** downloads
    `<course> (<semester>).zip`: the course outline, **CO-PO Mapping**, **Instructors and Schedule**, **CAR** (parts A–B filled, C–E as yellow
    placeholders with a drafted attainment comment), a **CO-PO Attainment Report**, the BUGS resolution link, the **CO-PO assessment marks
