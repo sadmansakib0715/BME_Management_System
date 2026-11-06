@@ -7,6 +7,6 @@ export default defineConfig({
   base: process.env.BASE_PATH ?? '/',
   plugins: [react()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-  build: { sourcemap: false, chunkSizeWarningLimit: 900,
-    rollupOptions: { output: { manualChunks: { xlsx: ['xlsx'], supabase: ['@supabase/supabase-js'], react: ['react', 'react-dom', 'react-router-dom'] } } } },
+  build: { sourcemap: false, chunkSizeWarningLimit: 1300,
+    rollupOptions: { output: { manualChunks: { xlsx: ['xlsx'], exceljs: ['exceljs'], supabase: ['@supabase/supabase-js'], react: ['react', 'react-dom', 'react-router-dom'] } } } },
 });

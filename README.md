@@ -127,6 +127,28 @@ existing databases run `supabase/update_obe_schema.sql` once.
 Mapping a CO to a PO ticks the K/P/A table: the PO's knowledge profiles (`pos.k_profiles`), P1 for POs on complex engineering
 problems, A1 for POs on complex engineering activities (`impliedKpa` in `src/lib/obe.ts`). “Tick from mapping” fills existing COs.
 
+### Course folder generator (no database changes)
+
+**OBE → Course folder** (also on each course: OBE → *Course folder*) builds the department course file from three files, in the browser:
+
+1. The faculty fills **course_information.xlsx** (sheets `info`, `faculties`, `routine` and **`sections`**: `section, first_roll, last_roll,
+   extra_ids, exclude_ids`; a blank one with notes can be downloaded on the page) and the **course outline** (.docx, the website outline format:
+   CO table, K/P/A table, distribution of marks, textbooks, lecture plan).
+2. **Download marks sheet**: student IDs are filled from the sections (batch + 18 + roll; batch = session start year − (level − 1), or the `batch` column).
+   Theory courses (odd course number, or `course_type`) get the BME 211 workbook: Attendance Summary, CA Marks (best *k* of *n* CTs), TF Marks,
+   **Assessment-CO Mapping** (marks and CO of each Q1/Q5 sub-part; CTs only if ticked), CO Marks, Individual and Cohort Attainment.
+   Sessional courses get one `ca` sheet: a column per assessment in the distribution of marks, its CO from the CO table's assessment tools.
+3. Upload the filled sheet (and optionally last term's generated workbook for the CAR's previous-term table) → **Build course folder** downloads
+   `<course> (<semester>).zip`: the course outline, **CO-PO Mapping**, **Instructors and Schedule**, **CAR** (parts A–B filled, C–E as yellow
+   placeholders with a drafted attainment comment), a **CO-PO Attainment Report**, the BUGS resolution link, the **CO-PO assessment marks
+   workbook** with live formulas, one folder per assessment with *Sample scripts to upload.txt* (highest, average = closest to the mean, lowest),
+   and the Lecture Materials folders, plus `_generation_log.txt` with every warning.
+
+Rules: student CO% = marks on the CO's items ÷ their maximum, attained at ≥ 40%; cohort ≥ 40% of students; student PO% = mean of the CO% of the
+COs mapped to it. `Abs`/`Absent`: absent in every item of a CO leaves the student out of that CO, absent in some counts as 0. The Word documents
+fill copies of the department's own files in `src/assets/course-folder/` (edit those to change the look). Code: `src/lib/courseFolder/`,
+tests: `tests/courseFolder.test.ts`. Marks are read in the browser and never stored.
+
 ### OBE documents and attainment from marks (0015)
 
 | Step | Where | What the teacher gets |
@@ -180,5 +202,5 @@ The switch cannot be changed from the website, only in the Supabase SQL Editor.
 If a workbook was committed before, remove it from history (`git filter-repo --path '<file>' --invert-paths`) and force-push.
 
 ## Not in this version (next phases)
-DOCX export of the CAR and course file (print/PDF works now), PEO surveys, rubric and peer-review tools for BME 300/350/400, notices, meetings and minutes,
+Saving the course folder's documents back to the database (the zip is built from uploaded files), PEO surveys, rubric and peer-review tools for BME 300/350/400, notices, meetings and minutes,
 leave, lab inventory, purchase requisitions, class routine, and grade computation/export.

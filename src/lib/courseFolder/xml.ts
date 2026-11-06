@@ -132,7 +132,7 @@ export class DocxPackage {
 
   static async open(data: ArrayBuffer | Uint8Array): Promise<DocxPackage> {
     const zip = await JSZip.loadAsync(data);
-    const parse = async (p: string) => new DOMParser().parseFromString(await zip.file(p)!.async('string'), 'text/xml');
+    const parse = async (p: string) => new DOMParser().parseFromString((await zip.file(p)!.async('string')).replace(/^\uFEFF/, '').trimStart(), 'text/xml');
     return new DocxPackage(zip, await parse('word/document.xml'), await parse('word/_rels/document.xml.rels'));
   }
 
