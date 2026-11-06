@@ -44,9 +44,6 @@ export interface Outline {
   textbooks: string[];
   /** The department outline's header block: Course No, Title, Credit / Contact hours, Level/Term, Academic Session. */
   header: { courseNo?: string; title?: string; credit?: string; contact?: string; level?: string; term?: string; session?: string };
-  /** Course Contents paragraphs and Course Objectives items, as written. */
-  contents: string[];
-  objectives: string[];
   /** Course Teacher(s) table. */
   teachers: { name: string; room: string; email: string; phone: string }[];
   /** Class routine from the teachers table (section, day, start_time, end_time). */

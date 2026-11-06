@@ -6,7 +6,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { DEPT_PATHS } from './DeptLayout';
 import { useTerm } from '@/lib/TermContext';
 import { useTheme, type ThemePref } from '@/lib/theme';
-import { Select } from './ui';
+import { Button, Select } from './ui';
 
 const DEPT = (import.meta.env.VITE_DEPT_NAME as string | undefined) ?? 'Department of BME, BUET';
 
@@ -109,6 +109,34 @@ function Sidebar() {
   );
 }
 
+/** Open access only: before anything is changed, ask who is using the site, so the activity log can name them.
+    "Just looking" hides the question for this browser tab. (Not security: with sign-in required this never shows.) */
+function WhoAreYou() {
+  const { openAccess, me, setActingAs } = useAuth();
+  const { faculty } = useTerm();
+  const [pick, setPick] = useState('');
+  const [skipped, setSkipped] = useState(() => { try { return sessionStorage.getItem('bme.justLooking') === '1'; } catch { return false; } });
+  if (!openAccess || me?.facultyId || skipped || !faculty.length) return null;
+  const skip = () => { try { sessionStorage.setItem('bme.justLooking', '1'); } catch { /* private window */ } setSkipped(true); };
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-hero/50 backdrop-blur-[2px] p-4" role="dialog" aria-modal="true" aria-labelledby="who-title">
+      <div className="w-full max-w-sm rounded-lg border border-line bg-surface p-5 shadow-pop space-y-3">
+        <h2 id="who-title" className="text-base font-semibold">Who are you?</h2>
+        <p className="text-sm text-muted">Choose your name, so the changes you make show your name in the activity log. You can change it later under “Viewing as”.</p>
+        <label htmlFor="who-name" className="sr-only">Your name</label>
+        <Select id="who-name" value={pick} onChange={(e) => setPick(e.target.value)}>
+          <option value="">Choose your name</option>
+          {faculty.filter((f) => f.status !== 'former').map((f) => <option key={f.id} value={f.id}>{f.display_name}</option>)}
+        </Select>
+        <div className="flex items-center justify-between gap-2">
+          <button type="button" className="link text-sm" onClick={skip}>Just looking</button>
+          <Button variant="primary" disabled={!pick} onClick={() => setActingAs(pick)}>Continue</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AppShell() {
   const [open, setOpen] = useState(false);
   const loc = useLocation();
@@ -131,6 +159,7 @@ export function AppShell() {
         </div>
       )}
       <main id="main" className="min-w-0 px-4 sm:px-6 lg:px-8 py-6 max-w-[1400px]"><Outlet /></main>
+      <WhoAreYou />
     </div>
   );
 }

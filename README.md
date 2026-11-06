@@ -139,13 +139,6 @@ problems, A1 for POs on complex engineering activities (`impliedKpa` in `src/lib
    course's page the website's own COs and mapping fill in otherwise. **course_information.xlsx** is optional (sheets `info`, `faculties`,
    `routine`, `sections`): it is checked against the outline (course no, credit hours, level/term, session; the outline's credit hours win). Without
    it, type the term, batch, number of students and missing rolls.
-   **Outline in another layout?** *Convert it to the department template* opens the outline converter: the teacher's outline (.docx or
-   .pdf) on the left, the department template on the right, filled in as far as the headings allow. Select text on the left (or drag a whole
-   paragraph or table by its handle) and drop it on a part of the template: bullets and numbers become list items, “Lab test (x2): 40%” an
-   assessment row, “3 Topic” or a table row a schedule row, a teachers table its rows (names, rooms, emails, phones; the routine apart).
-   Every part can be typed in. **Download outline (.docx)** or **Use in course folder**. Code: `src/lib/outlineDraft.ts` (drop rules),
-   `outlineAutoFill.ts`, `outlineDocx.ts` (the Word file), `sourceDoc.ts` (reading .docx / .pdf), `src/pages/obe/OutlineConverter.tsx`.
-   Scanned PDFs have no text and cannot be read; a PDF's weekly schedule usually needs tidying.
 2. Beside the uploads the page shows what was read (course details, teachers, COs with their POs and tools) and the **assessment tree**: each
    assessment from the outline with its weight, its marks (credit hours × 100 × weight) and the COs whose Assessment Tool(s) name it. It can be
    edited: rename, change a weight, tick COs, add or remove assessments.
@@ -194,6 +187,14 @@ direct writes to exam tasks refused; dependency and ownership blocks; the full c
 CT clash detection; over-maximum and locked marks; item generation per sub-section; roster loading; admin-only import.
 
 ## Open access (no sign-in)
+**Who can change what (with sign-in required).** A course's COs, CO-PO mapping, assessment map, rubrics, outline, attainment, CAR
+and course records can be changed only by that course's teachers and admins / HOD; an exam step only by the person assigned to it (a
+moderator updates the moderation step and nothing else); a CAR is reviewed or finalised only by the OBE Cell / HOD. These rules are in the
+database (row-level security), and `supabase/tests/integration.sql` checks them. Open access bypasses all of them (every visitor is an
+admin), so to enforce them run **`supabase/require_sign_in.sql`**: it puts every faculty member with an email on the access list and
+turns open access off (it refuses to run if there is no admin or HOD). Teachers then sign in with “First time” and their department
+email, and the activity log names them. While open access is still on, the site asks “Who are you?” once so changes carry a name.
+
 The database has one switch, `app_settings.open_access`, and `supabase/setup.sql` turns it **on**:
 nobody signs in, every visitor acts as an admin, and the sidebar shows a **Viewing as** picker so
 **My courses** still shows that person's courses. The picker is a convenience, not security.

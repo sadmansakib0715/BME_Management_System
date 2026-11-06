@@ -6,7 +6,6 @@ import type { BuildResult, RollInput, Sources } from '@/lib/courseFolder/build';
 import { batchOf, isSessional, type CO, type CourseInfo, type Outline } from '@/lib/courseFolder/model';
 import { checkPlan, planCounts, type Plan } from '@/lib/courseFolder/plan';
 import { AssessmentTree } from './AssessmentTree';
-import { OutlineConverter } from './OutlineConverter';
 import carUrl from '@/assets/course-folder/car.docx?url';
 import coPoUrl from '@/assets/course-folder/co_po_mapping.docx?url';
 import instructorsUrl from '@/assets/course-folder/instructors_and_schedule.docx?url';
@@ -79,7 +78,6 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
   const [reading, setReading] = useState(false);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [downloaded, setDownloaded] = useState(false);
-  const [converting, setConverting] = useState(false);
   const fail = (e: unknown) => toast('bad', (e as Error).message ?? String(e));
 
   // Student IDs: always from the roll range typed on the page (batch + 18 + roll), with or without a course information workbook.
@@ -150,7 +148,7 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
       const { buildCourseFolder } = await lib();
       const [car, coPoMapping, instructors] = await Promise.all([fetchBytes(carUrl), fetchBytes(coPoUrl), fetchBytes(instructorsUrl)]);
       const r = await buildCourseFolder({ ...(await sources()), marks: await marks.arrayBuffer(),
-        previous: previous ? await previous.arrayBuffer() : null, templates: { car, coPoMapping, instructors }, counts: plan && plan.layout === 'columns' ? planCounts(plan) : undefined });
+        previous: previous ? await previous.arrayBuffer() : null, templates: { car, coPoMapping, instructors }, counts: plan ? planCounts(plan) : undefined });
       setResult(r);
       save(r.zip, r.fileName, 'application/zip');
       toast('ok', `${r.fileName} downloaded`);
@@ -173,8 +171,6 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
           <div className="space-y-3">
             <FilePick id="cf-outline" label="Course outline (.docx)" accept=".docx" file={outline} onFile={(f) => { setOutline(f); setResult(null); }} />
-            <p className="text-2xs text-muted -mt-1">Outline in another layout (.docx or .pdf)? <button type="button" className="link font-medium" onClick={() => setConverting(true)}>Convert it to the department template</button>: drag its text into the template, then use it here.</p>
-            <OutlineConverter open={converting} onClose={() => setConverting(false)} onUse={(f) => { setOutline(f); setResult(null); }} />
             <FilePick id="cf-mapping" label="CO-PO mapping (.docx, optional)" accept=".docx" file={mapping} onFile={(f) => { setMapping(f); setResult(null); }} />
             <FilePick id="cf-info" label="Course information (.xlsx, optional)" accept=".xlsx" file={info} onFile={(f) => { setInfo(f); setResult(null); }} />
             <div className="rounded border border-line p-3 space-y-2">

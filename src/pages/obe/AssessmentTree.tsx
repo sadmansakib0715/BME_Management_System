@@ -36,6 +36,10 @@ export function AssessmentTree({ plan, onChange, cos, courseLabel, sessional, di
           <span className="font-semibold">{courseLabel}</span>
           <span className={`tabular text-2xs ${Math.abs(pct - 100) > 0.01 || Math.abs(marks - plan.total) > 0.01 ? 'text-warn font-semibold' : 'text-muted'}`}>{fmt(pct)}% · {fmt(marks)} / {fmt(plan.total)} marks</span>
         </div>
+        <div className="hidden sm:flex items-center gap-2 px-3 pt-2 text-2xs font-semibold uppercase tracking-wide text-subtle" aria-hidden>
+          <span className="w-3" /><span className="flex-1 min-w-40">Assessment (from the outline)</span><span className="w-[5.5rem] text-right">Weight</span>
+          <span className="w-20 text-right">Marks</span><span className="w-24 text-center">How many taken</span>{!disabled && <span className="w-8" />}
+        </div>
         <ul className="divide-y divide-line">
           {plan.items.map((it, k) => (
             <li key={k} className="px-3 py-2.5 space-y-2">
@@ -45,14 +49,14 @@ export function AssessmentTree({ plan, onChange, cos, courseLabel, sessional, di
                 <Input id={`tree-name-${k}`} className="h-8 flex-1 min-w-40" disabled={disabled} placeholder="Assessment, e.g. Quiz" value={it.name}
                   onChange={(e) => setItem(k, { ...it, name: e.target.value, kind: kindOf(e.target.value) })} />
                 <label className="sr-only" htmlFor={`tree-pct-${k}`}>Weight (%)</label>
-                <div className="flex items-center gap-1"><Input id={`tree-pct-${k}`} type="number" min={0} max={100} step="any" className="h-8 w-20 text-right" disabled={disabled}
+                <div className="w-[5.5rem] flex items-center justify-end gap-1"><Input id={`tree-pct-${k}`} type="number" min={0} max={100} step="any" className="h-8 w-20 text-right" disabled={disabled}
                   value={it.pct} onChange={(e) => setPct(k, Number(e.target.value) || 0)} /><span className="text-2xs text-muted">%</span></div>
                 <span className="text-2xs text-muted tabular w-20 text-right">{fmt(it.marks)} marks</span>
-                {plan.layout === 'columns' && <div className="flex items-center gap-1" title="How many were taken, e.g. 3 lab tests. Only the course folder uses it: Lab Test 01, 02, 03.">
-                  <label htmlFor={`tree-count-${k}`} className="text-2xs text-muted">×</label>
-                  <Input id={`tree-count-${k}`} type="number" min={1} max={30} step={1} className="h-8 w-16 text-right" disabled={disabled} aria-label={`How many ${it.name || 'assessments'} were taken`}
+                <div className="w-24 flex items-center justify-center gap-1" title="How many were taken, e.g. 2 lab tests. Marks are unaffected; the course folder gets a folder for each: Lab Test 01, Lab Test 02.">
+                  <span className="text-2xs text-muted sm:hidden">How many taken</span><span className="text-2xs text-muted hidden sm:inline" aria-hidden>×</span>
+                  <Input id={`tree-count-${k}`} type="number" min={1} max={30} step={1} className="h-8 w-14 text-right" disabled={disabled} aria-label={`How many ${it.name || 'assessments'} were taken`}
                     value={it.count ?? 1} onChange={(e) => setItem(k, { ...it, count: Math.min(30, Math.max(1, Math.floor(Number(e.target.value) || 1))) })} />
-                </div>}
+                </div>
                 {!disabled && <button type="button" className="size-8 grid place-items-center rounded text-muted hover:text-bad hover:bg-sunken cursor-pointer" aria-label={`Remove ${it.name || 'assessment'}`} onClick={() => remove(k)}><Trash2 className="size-4" aria-hidden /></button>}
               </div>
               <div className="pl-5 flex flex-wrap items-center gap-1.5" role="group" aria-label={`COs assessed by ${it.name || 'this assessment'}`}>

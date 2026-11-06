@@ -35,6 +35,22 @@ do $$ begin
   update public.exam_tasks set status = 'examined';
   if (select count(*) from public.exam_tasks where status = 'examined') <> 0 then raise exception 'FAIL: direct exam_tasks write allowed'; end if;
 end $$;
+-- A teacher cannot change another teacher's course: course records, COs, outline, assessment map (all silently refused or rejected).
+do $$ declare o uuid; n int; begin
+  if public.fn_is_admin() then raise exception 'FAIL: test user 6 should be plain faculty'; end if;
+  select id into o from public.offerings where not public.fn_teaches(id) limit 1;
+  if o is null then raise exception 'FAIL: test needs a course user 6 does not teach'; end if;
+  update public.course_records set notes = 'not mine' where offering_id = o; get diagnostics n = row_count;
+  if n <> 0 then raise exception 'FAIL: another teacher edited course records'; end if;
+  update public.course_outcomes set statement = 'not mine' where offering_id = o; get diagnostics n = row_count;
+  if n <> 0 then raise exception 'FAIL: another teacher edited a CO'; end if;
+  begin insert into public.course_outcomes (offering_id, code, statement) values (o, 'CO9', 'not mine'); raise exception 'FAIL: another teacher added a CO';
+  exception when insufficient_privilege then null; end;
+  begin insert into public.obe_offering_docs (offering_id, contents) values (o, 'not mine'); raise exception 'FAIL: another teacher wrote the outline';
+  exception when insufficient_privilege then null; end;
+  begin insert into public.obe_criteria (offering_id, assessment, label, max_marks) values (o, 'Term Final', 'Q1', 10); raise exception 'FAIL: another teacher changed the assessment map';
+  exception when insufficient_privilege then null; end;
+end $$;
 
 -- Dependency block: Farhan cannot examine before printing.
 reset role; select pg_temp.as_user(4); set local role authenticated;
