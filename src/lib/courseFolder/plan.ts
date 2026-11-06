@@ -4,11 +4,11 @@
 import { fmtNum, isSessional, norm, type CourseInfo, type Item, type Outline, Warnings } from './model';
 
 export type AssessmentKind = 'attendance' | 'ct' | 'final' | 'other';
-/** One column of the marks sheet: the CO it counts towards and its marks. */
-export interface PlanPart { co: number | null; marks: number }
-export interface PlanItem { name: string; pct: number; kind: AssessmentKind; parts: PlanPart[] }
+/** One assessment = one column of the marks sheet: its weight, its marks and every CO it assesses. An assessment that covers
+    two COs stays one column; its marks count towards each of those COs. */
+export interface PlanItem { name: string; pct: number; kind: AssessmentKind; cos: number[]; marks: number }
 /** `theory` = the department's theory workbook (attendance, best-of class tests, term final by question);
-    `columns` = one column per assessment (per CO when an assessment covers several COs). */
+    `columns` = one column per assessment. */
 export interface Plan { total: number; layout: 'theory' | 'columns'; items: PlanItem[] }
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
@@ -43,15 +43,6 @@ export function cosFor(o: Outline, assessment: string): number[] {
   return o.cos.filter((c) => tools(c.tools).some((t) => matches(assessment, t))).map((c) => c.no);
 }
 
-/** Splits `marks` over the COs, two decimals, the last taking the remainder. */
-export function splitParts(cos: (number | null)[], marks: number): PlanPart[] {
-  if (!cos.length) return [{ co: null, marks: round2(marks) }];
-  const share = round2(marks / cos.length);
-  return cos.map((co, j) => ({ co, marks: j < cos.length - 1 ? share : round2(marks - share * (cos.length - 1)) }));
-}
-
-export const itemMarks = (it: PlanItem) => round2(it.parts.reduce((a, p) => a + p.marks, 0));
-
 /** The tree read from the outline. Marks total = credit hours × 100. */
 export function planFromOutline(info: CourseInfo, o: Outline, w: Warnings = new Warnings()): Plan {
   const total = round2(info.credit * 100);
@@ -59,7 +50,7 @@ export function planFromOutline(info: CourseInfo, o: Outline, w: Warnings = new 
   const items: PlanItem[] = o.distribution.map(({ name, pct }) => {
     const kind = kindOf(name);
     const cos = cosFor(o, name);
-    return { name, pct, kind, parts: splitParts(cos, (total * pct) / 100) };
+    return { name, pct, kind, cos, marks: round2((total * pct) / 100) };
   });
   return { total, items, layout: defaultLayout(info, items) };
 }
@@ -76,27 +67,25 @@ export function checkPlan(p: Plan, o: Outline): { errors: string[]; warnings: st
   if (!p.items.length) errors.push('Add at least one assessment.');
   p.items.forEach((it, k) => {
     if (!it.name.trim()) errors.push(`Assessment ${k + 1} has no name.`);
-    if (it.parts.some((x) => !(x.marks > 0))) errors.push(`${it.name || `Assessment ${k + 1}`}: every column needs marks above 0.`);
-    const cos = it.parts.map((x) => x.co).filter((c): c is number => c !== null);
-    if (new Set(cos).size !== cos.length) errors.push(`${it.name}: the same CO appears twice.`);
-    if (!cos.length && it.kind !== 'attendance') warnings.push(`${it.name || `Assessment ${k + 1}`} has no CO (no CO's Assessment Tool(s) names it), so it does not count towards attainment: pick its CO.`);
+    if (!(it.marks > 0)) errors.push(`${it.name || `Assessment ${k + 1}`} needs marks above 0 (give it a weight).`);
+    if (!it.cos.length && it.kind !== 'attendance') warnings.push(`${it.name || `Assessment ${k + 1}`} has no CO (no CO's Assessment Tool(s) names it), so it does not count towards attainment: pick its CO.`);
   });
-  const pct = p.items.reduce((a, i) => a + i.pct, 0), marks = round2(p.items.reduce((a, i) => a + itemMarks(i), 0));
+  const pct = p.items.reduce((a, i) => a + i.pct, 0), marks = round2(p.items.reduce((a, i) => a + i.marks, 0));
   if (p.items.length && Math.abs(pct - 100) > 0.01) warnings.push(`Weights add up to ${fmtNum(pct)}%, not 100%.`);
   if (p.items.length && Math.abs(marks - p.total) > 0.01) warnings.push(`Marks add up to ${fmtNum(marks)}, not ${fmtNum(p.total)} (credit hours × 100).`);
-  for (const c of o.cos) if (!p.items.some((i) => i.parts.some((x) => x.co === c.no))) warnings.push(`CO${c.no} is not assessed.`);
+  for (const c of o.cos) if (!p.items.some((i) => i.cos.includes(c.no))) warnings.push(`CO${c.no} is not assessed.`);
   if (p.layout === 'theory' && !canUseTheory(p.items)) errors.push('The theory workbook needs class tests and a term final, and nothing other than attendance; choose "One column per assessment".');
   return { errors, warnings };
 }
 
-/** Marks-sheet columns for the `columns` layout: one per part, named "Assessment (COn)" when an assessment is split by CO. */
+/** Marks-sheet columns for the `columns` layout: one per assessment, with all its COs. */
 export function planColumns(p: Plan): Item[] {
-  return p.items.flatMap((it) => it.parts.map((x) => ({ name: it.parts.length > 1 && x.co !== null ? `${it.name} (CO${x.co})` : it.name, cos: x.co === null ? [] : [x.co], max: x.marks })));
+  return p.items.map((it) => ({ name: it.name, cos: [...it.cos].sort((a, b) => a - b), max: it.marks }));
 }
 
-/** Weights for the theory workbook: attendance %, class-test %, term-final %, and the class tests' CO when they assess one. */
-export function theoryWeights(p: Plan): { att: number; ca: number; tf: number; ctCo: number | null } {
+/** Weights for the theory workbook: attendance %, class-test %, term-final %, and the COs the class tests assess. */
+export function theoryWeights(p: Plan): { att: number; ca: number; tf: number; ctCos: number[] } {
   const sum = (k: AssessmentKind) => p.items.filter((i) => i.kind === k).reduce((a, i) => a + i.pct, 0);
-  const ctCos = [...new Set(p.items.filter((i) => i.kind === 'ct').flatMap((i) => i.parts.map((x) => x.co)).filter((c): c is number => c !== null))];
-  return { att: sum('attendance'), ca: sum('ct'), tf: sum('final'), ctCo: ctCos.length === 1 ? ctCos[0] : null };
+  const ctCos = [...new Set(p.items.filter((i) => i.kind === 'ct').flatMap((i) => i.cos))].sort((a, b) => a - b);
+  return { att: sum('attendance'), ca: sum('ct'), tf: sum('final'), ctCos };
 }

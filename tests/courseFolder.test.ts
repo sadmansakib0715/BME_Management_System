@@ -95,9 +95,9 @@ describe('theory course folder (BME 211 workbook layout)', () => {
       [['A', 1, 3, '', '']]);
     // A theory course assessed by attendance, class tests and the term final uses the department's theory workbook.
     const plan: Plan = { total: 300, layout: 'theory', items: [
-      { name: 'Class participation', pct: 10, kind: 'attendance', parts: [{ co: null, marks: 30 }] },
-      { name: 'Class tests', pct: 20, kind: 'ct', parts: [{ co: null, marks: 60 }] },
-      { name: 'Term final', pct: 70, kind: 'final', parts: [{ co: null, marks: 210 }] }] };
+      { name: 'Class participation', pct: 10, kind: 'attendance', cos: [], marks: 30 },
+      { name: 'Class tests', pct: 20, kind: 'ct', cos: [], marks: 60 },
+      { name: 'Term final', pct: 70, kind: 'final', cos: [], marks: 210 }] };
     const t = await buildMarksTemplate({ info, outline }, plan);
     expect(t.sessional).toBe(false);
     const wb = new ExcelJS.Workbook();
@@ -159,22 +159,49 @@ describe("the department's outline layout", () => {
     expect(p.info.routine).toEqual([{ day: 'Sunday', section: 'A1', start_time: '02:00 PM', end_time: '05:00 PM' }]);
     expect(p.outline.cos.map((c) => [c.no, c.statement, c.pos])).toEqual([[1, 'Design a simple device', [3]], [2, 'Present the design', [10]], [3, 'Write a report', [10]]]);
     expect(p.plan.layout).toBe('columns');
-    expect(p.plan.items.map((i) => [i.name, i.pct, i.parts])).toEqual([
-      ['Quiz', 20, [{ co: 3, marks: 30 }]], ['Continuous Assessment', 30, [{ co: 1, marks: 45 }]], ['Project', 50, [{ co: 1, marks: 37.5 }, { co: 2, marks: 37.5 }]]]);
+    expect(p.plan.items.map((i) => [i.name, i.pct, i.cos, i.marks])).toEqual([['Quiz', 20, [3], 30], ['Continuous Assessment', 30, [1], 45], ['Project', 50, [1, 2], 75]]);
     expect(checkPlan(p.plan, p.outline)).toEqual({ errors: [], warnings: [] });
-    expect(planColumns(p.plan).map((c) => [c.name, c.cos, c.max])).toEqual([['Quiz', [3], 30], ['Continuous Assessment', [1], 45], ['Project (CO1)', [1], 37.5], ['Project (CO2)', [2], 37.5]]);
+    expect(planColumns(p.plan).map((c) => [c.name, c.cos, c.max])).toEqual([['Quiz', [3], 30], ['Continuous Assessment', [1], 45], ['Project', [1, 2], 75]]);   // two COs, still one assessment
   });
 
   it('builds the marks sheet from the edited tree, with the student IDs from the roll range', async () => {
     const src = { outline: await deptOutline(), mapping: await deptMapping(), roll: { semester: 'July 2025', batch: '21', count: 5, missingIds: ['2118003'] } };
     const { plan } = await previewSources(src);
-    plan.items[2].parts = [{ co: 1, marks: 25 }, { co: 2, marks: 50 }];   // the faculty changes the split on the page
+    plan.items[0].cos = [2, 3];   // the faculty ticks a second CO on the page
     const t = await buildMarksTemplate(src, plan);
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(t.bytes as unknown as ArrayBuffer);
     const ws = wb.getWorksheet('ca')!;
-    expect([1, 2, 3].map((r) => [2, 3, 4, 5].map((c) => ws.getCell(r, c).value))).toEqual([['Quiz', 'Continuous Assessment', 'Project (CO1)', 'Project (CO2)'], ['CO3', 'CO1', 'CO1', 'CO2'], [30, 45, 25, 50]]);
+    expect([1, 2, 3].map((r) => [2, 3, 4, 5].map((c) => ws.getCell(r, c).value))).toEqual([['Quiz', 'Continuous Assessment', 'Project', 'Total'], ['CO2, CO3', 'CO1', 'CO1, CO2', null], [30, 45, 75, { formula: 'SUM(B3:D3)' }]]);
     expect([5, 6, 7, 8, 9].map((r) => ws.getCell(`A${r}`).value)).toEqual([2118001, 2118002, 2118004, 2118005, null]);
+  });
+
+  it('counts an assessment that covers two COs for both, as one column, through to the course folder', async () => {
+    const src = { outline: await deptOutline(), mapping: await deptMapping(), roll: { semester: 'July 2025', batch: '21', count: 2, missingIds: [] } };
+    const t = await buildMarksTemplate(src);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(t.bytes as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet('ca')!;
+    // Quiz (30, CO3) | Continuous Assessment (45, CO1) | Project (75, CO1 and CO2)
+    [[15, 45, 75], [12, 9, 15]].forEach((row, i) => row.forEach((v, k) => (ws.getCell(5 + i, 2 + k).value = v)));
+    const res = await buildCourseFolder({ ...src, marks: new Uint8Array(await wb.xlsx.writeBuffer()), templates });
+    // Student 1: CO1 = (45 + 75) / 120 = 100%, CO2 = 75 / 75, CO3 = 15 / 30. Student 2: CO1 = 24 / 120 = 20%, CO2 = 20%, CO3 = 40%.
+    expect([...res.attainment.studentCo].map(([k, v]) => [k, Math.round(v! * 100) / 100])).toEqual([
+      ['2118001:1', 100], ['2118001:2', 100], ['2118001:3', 50], ['2118002:1', 20], ['2118002:2', 20], ['2118002:3', 40]]);
+    const out = new ExcelJS.Workbook();
+    const zip = await JSZip.loadAsync(res.zip);
+    await out.xlsx.load(await zip.file(/CO-PO-Assessment-marks\.xlsx$/)[0].async('arraybuffer'));
+    const mp = out.getWorksheet('Assessment-CO Mapping')!;
+    expect(['B', 'D', 'E', 'F'].map((c) => mp.getCell(`${c}4`).value)).toEqual(['Project', 1, 1, null]);   // ticked under CO1 and CO2
+    expect((out.getWorksheet('CO Marks')!.getCell('D3').value as { result: string }).result).toBe('CO1, CO2');
+  }, 30000);
+
+  it('accepts "Course No" and "Course Number" for the course number', async () => {
+    for (const label of ['Course No:\t\tBME 999', 'Course No. BME 999', 'Course Number:\tBME 999', 'COURSE NUMBER : bme-999']) {
+      const doc = await docx([P(label), P('Credit hours:\t1.5'), P('Course Outcomes:'), P('Design a simple device')].join(''));
+      const p = await previewSources({ outline: doc, roll: { semester: 'July 2025', batch: '21', count: 2, missingIds: [] } });
+      expect(p.info.courseNo, label).toBe('BME 999');
+    }
   });
 
   it('matches assessment names to CO assessment tools without false hits', async () => {

@@ -139,9 +139,9 @@ problems, A1 for POs on complex engineering activities (`impliedKpa` in `src/lib
    it, type the term, batch, number of students and missing rolls.
 2. Beside the uploads the page shows what was read (course details, teachers, COs with their POs and tools) and the **assessment tree**: each
    assessment from the outline with its weight, its marks (credit hours × 100 × weight) and the COs whose Assessment Tool(s) name it. It can be
-   edited: rename, change a weight, tick COs, change how an assessment covering several COs is split, add or remove assessments.
-   **Download marks sheet** builds the sheet from the tree: one `ca` sheet with a column per assessment (per CO when it covers several), its CO
-   and marks, and the student IDs. Theory courses assessed only by attendance, class tests and the term final can instead use the BME 211 workbook
+   edited: rename, change a weight, tick COs, add or remove assessments.
+   **Download marks sheet** builds the sheet from the tree: one `ca` sheet with one column per assessment, its marks and all its COs (an assessment
+   covering two COs stays one column and counts fully for each), and the student IDs. Theory courses assessed only by attendance, class tests and the term final can instead use the BME 211 workbook
    (Attendance Summary, CA Marks with best *k* of *n* CTs, TF Marks, Assessment-CO Mapping for the Q1/Q5 sub-parts, CO Marks, attainment sheets),
    with the weights from the tree. No sheet has Position columns.
 3. Upload the filled sheet (and optionally last term's generated workbook for the CAR's previous-term table) → **Build course folder** downloads

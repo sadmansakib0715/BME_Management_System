@@ -51,11 +51,11 @@ export async function readCourseInfo(data: ArrayBuffer | Uint8Array): Promise<Co
   if (!info) throw new Error("course information: the 'info' sheet is empty");
   const credit = Number(info.credit_hours);
   if (!Number.isFinite(credit) || credit <= 0) throw new Error(`course information: credit_hours '${info.credit_hours ?? ''}' is not a number`);
-  const known = new Set(['course_no', 'credit_hours', 'contact_hours', 'level', 'term', 'semester', 'session']);
+  const known = new Set(['course_no', 'course_number', 'credit_hours', 'contact_hours', 'level', 'term', 'semester', 'session']);
   const extra: Rec = {};
   for (const [k, v] of Object.entries(info)) if (!known.has(k) && v) extra[k] = v;
   return {
-    courseNo: clean(info.course_no).toUpperCase().replace(/^([A-Z]+)\s*-?\s*(\d)/, '$1 $2'),
+    courseNo: clean(info.course_no || info.course_number).toUpperCase().replace(/^([A-Z]+)\s*-?\s*(\d)/, '$1 $2'),
     credit, contactHours: info.contact_hours ?? '', level: info.level ?? '', term: info.term ?? '',
     semester: info.semester ?? '', session: info.session ?? '', extra,
     faculties: sheetRecords(sheet('faculties')), routine: sheetRecords(sheet('routine')), sections: sheetRecords(sheet('sections')),
@@ -79,11 +79,15 @@ export function parseRoutine(text: string): Rec[] {
     .map((m) => ({ day: m[1], section: m[2] ?? '', start_time: m[3].toUpperCase().replace(/\s+/g, ' '), end_time: m[4].toUpperCase().replace(/\s+/g, ' ') }));
 }
 
+/** "Course No:", "Course No.", "Course Number:" all label the course number (the outline says No, the CAR says Number). */
+export const COURSE_NO_LABEL = /course\s*(?:no\.?|number)\s*[:.]?\s*/i;
+const COURSE_NO = new RegExp(`${COURSE_NO_LABEL.source}([A-Za-z]+\\s*-?\\s*\\d{3}[A-Za-z]?)`, 'i');
+
 /** The header block of the department's outline ("Course No:\tBME 210", "Credit hours:\t0.75\tContact hours:\t1.5", …). */
 function readHeaderLine(raw: string, h: Outline['header']) {
   const t = raw.replace(/\s+/g, ' ');
   const m = (rx: RegExp) => t.match(rx)?.[1]?.trim();
-  h.courseNo ??= m(/course\s*no\.?\s*:\s*([A-Za-z]+\s*-?\s*\d{3}[A-Za-z]?)/i)?.toUpperCase().replace(/^([A-Z]+)\s*-?\s*/, '$1 ');
+  h.courseNo ??= m(COURSE_NO)?.toUpperCase().replace(/^([A-Z]+)\s*-?\s*/, '$1 ');
   h.title ??= m(/course\s*title\s*:\s*(.+)$/i);
   h.credit ??= m(/credit\s*hours?\s*:\s*(\d+(?:\.\d+)?)/i);
   h.contact ??= m(/contact\s*hours?\s*:\s*(\d+(?:\.\d+)?)/i);
@@ -192,7 +196,7 @@ export function mergeSiteCos(o: Outline, site: CO[]): Outline {
 export function infoFromOutline(o: Outline, a: { semester: string; batch: string; count: number; missingIds: string[]; courseType?: string }): CourseInfo {
   const h = o.header;
   const credit = Number(h.credit);
-  if (!o.courseNo) throw new Error('course outline: no "Course No:" found, so the course information workbook is needed');
+  if (!o.courseNo) throw new Error('course outline: no "Course No:" / "Course Number:" found, so the course information workbook is needed');
   if (!Number.isFinite(credit) || credit <= 0) throw new Error('course outline: no "Credit hours:" found, so the course information workbook is needed');
   return {
     courseNo: o.courseNo, credit, contactHours: h.contact ?? '', level: h.level ?? '', term: h.term ?? '', semester: a.semester, session: h.session ?? '',

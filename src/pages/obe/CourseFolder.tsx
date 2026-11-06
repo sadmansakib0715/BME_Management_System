@@ -199,7 +199,7 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
         </div>
       </Step>
 
-      <Step n={2} title="Marks sheet" subtitle="Built from the assessment tree above: one column per assessment (per CO when it covers several), with its CO and marks. The department theory workbook is used for theory courses assessed by attendance, class tests and the term final. No Position columns.">
+      <Step n={2} title="Marks sheet" subtitle="Built from the assessment tree above: one column per assessment with its marks and every CO it assesses (an assessment covering two COs stays one column, counted for both). The department theory workbook is used for theory courses assessed by attendance, class tests and the term final. No Position columns.">
         <Button variant="primary" size="sm" icon={<Download className="size-4" aria-hidden />} disabled={!haveInputs || !plan || !preview || !!check?.errors.length} loading={busy === 'template'} onClick={template}>Download marks sheet</Button>
         {tplWarnings && <Warnings list={tplWarnings} />}
       </Step>

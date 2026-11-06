@@ -14,7 +14,8 @@ export const IND = 'Individual Attainment CO & PO';
 export const COH = 'Cohort Attainment';
 const TF_SLOTS = [...'abcde'].map((c) => `Q01 (${c})`).concat([...'abcde'].map((c) => `Q05 (${c})`));
 
-export interface Slot { group: string; name: string; max: number | null; co: number | null; src: [string, string] | null; row?: number }
+/** One row of the Assessment-CO Mapping: an assessment item and every CO it assesses (one 1 under each). */
+export interface Slot { group: string; name: string; max: number | null; cos: number[]; src: [string, string] | null; row?: number }
 export interface Spec {
   kind: 'theory' | 'sessional';
   slots: Slot[];
@@ -75,8 +76,8 @@ function statsRows(ws: ExcelJS.Worksheet, cols: string[], first: number, last: n
 const markOut = (v: number | null | undefined, filled: boolean, absent = 'Absent'): V => (v === null || v === undefined ? (filled ? absent : null) : v);
 
 // ------------------------------------------------------------------ theory plan
-/** Weights (%) of attendance, class tests and term final, and the class tests' CO when the outline gives one. */
-export interface TheoryWeights { att: number; ca: number; tf: number; ctCo?: number | null }
+/** Weights (%) of attendance, class tests and term final, and the COs the class tests assess. */
+export interface TheoryWeights { att: number; ca: number; tf: number; ctCos?: number[] }
 
 export function theorySpec(info: CourseInfo, o: Outline, w: Warnings, weights?: TheoryWeights): Spec {
   let att: number | null = weights?.att ?? null, ca: number | null = weights?.ca ?? null, tf: number | null = weights?.tf ?? null;
@@ -98,8 +99,8 @@ export function theorySpec(info: CourseInfo, o: Outline, w: Warnings, weights?: 
     kind: 'theory', att, ca, tf, faculty, attTotal, attEach: Math.round((attTotal / faculty.length) * 100) / 100, nCt, best, ctMax,
     tfSection: Math.round(((total * tf) / 100 / 2) * 100) / 100,
     slots: [
-      ...TF_SLOTS.map((s): Slot => ({ group: 'Term Final', name: s, max: null, co: null, src: null })),
-      ...Array.from({ length: nCt }, (_, k): Slot => ({ group: 'Class Tests (optional)', name: `CT${String(k + 1).padStart(2, '0')}`, max: ctMax, co: weights?.ctCo ?? null, src: ['CA Marks', colL(2 + k)] })),
+      ...TF_SLOTS.map((s): Slot => ({ group: 'Term Final', name: s, max: null, cos: [], src: null })),
+      ...Array.from({ length: nCt }, (_, k): Slot => ({ group: 'Class Tests (optional)', name: `CT${String(k + 1).padStart(2, '0')}`, max: ctMax, cos: weights?.ctCos ?? [], src: ['CA Marks', colL(2 + k)] })),
     ],
   };
 }
@@ -251,7 +252,6 @@ export async function courseWorkbook(info: CourseInfo, o: Outline, ids: number[]
   let ws = wb.addWorksheet(MAP);
   hdr(ws, 'A1', 'CO-Assessment Mapping'); hdr(ws, 'B1', 'Assessment'); hdr(ws, 'C1', 'Marks');
   const coCol = new Map(cos.map((c, k) => [c, colL(4 + k)]));
-  const lastco = colL(3 + cos.length);
   for (const c of cos) hdr(ws, `${coCol.get(c)}1`, `CO${c}`);
   const groups: [string, number, number][] = [];
   slots.forEach((s, k) => {
@@ -262,8 +262,8 @@ export async function courseWorkbook(info: CourseInfo, o: Outline, ids: number[]
     cell(ws, `B${r}`, s.name, { bold: true, inp: template && !s.src });
     cell(ws, `C${r}`, s.max, { inp: template && !s.src });
     for (const c of cos) {
-      cell(ws, `${coCol.get(c)}${r}`, s.co === c ? 1 : null, { inp: template });
-      ws.getCell(`${coCol.get(c)}${r}`).dataValidation = { type: 'whole', operator: 'equal', formulae: [1], allowBlank: true, showErrorMessage: true, error: 'Put 1 under the single CO this item assesses.' };
+      cell(ws, `${coCol.get(c)}${r}`, s.cos.includes(c) ? 1 : null, { inp: template });
+      ws.getCell(`${coCol.get(c)}${r}`).dataValidation = { type: 'whole', operator: 'equal', formulae: [1], allowBlank: true, showErrorMessage: true, error: 'Put 1 under each CO this item assesses.' };
     }
   });
   const lastSlot = 1 + slots.length;
@@ -293,7 +293,8 @@ export async function courseWorkbook(info: CourseInfo, o: Outline, ids: number[]
     const c = scol[k], mr = s.row!;
     hdr(ws, `${c}2`, f(`IF('${MAP}'!B${mr}="","",IF('${MAP}'!C${mr}="",'${MAP}'!B${mr},'${MAP}'!B${mr}&" ("&TEXT('${MAP}'!C${mr},"0.0")&")"))`,
       s.name + (s.max ? ` (${s.max.toFixed(1)})` : '')));
-    hdr(ws, `${c}3`, f(`IF(COUNTIF('${MAP}'!D${mr}:${lastco}${mr},1)=0,"",INDEX('${MAP}'!$D$1:$${lastco}$1,1,MATCH(1,'${MAP}'!D${mr}:${lastco}${mr},0)))`, s.co ? `CO${s.co}` : ''));
+    // Every ticked CO, e.g. "CO1, CO2".
+    hdr(ws, `${c}3`, f(`SUBSTITUTE(TRIM(${cos.map((x) => `IF('${MAP}'!${coCol.get(x)}${mr}=1,"CO${x} ","")`).join('&')})," ",", ")`, s.cos.map((x) => `CO${x}`).join(', ')));
   });
   for (const [g] of groups) {
     const ks = slots.map((s, k) => (s.group === g ? k : -1)).filter((k) => k >= 0);
@@ -301,14 +302,13 @@ export async function courseWorkbook(info: CourseInfo, o: Outline, ids: number[]
     if (c1 !== c2) ws.mergeCells(`${c1}1:${c2}1`);
     hdr(ws, `${c1}1`, g);
   }
-  const lastsc = colL(1 + slots.length);
   ids.forEach((sid, i) => {
     const r = 4 + i;
     cell(ws, `A${r}`, sid);
     slots.forEach((s, k) => {
       if (!s.src) {
         const v = d.slot?.get(key(sid, k));
-        cell(ws, `${scol[k]}${r}`, v ?? (filled && s.co ? 'Abs' : null), { inp: true });
+        cell(ws, `${scol[k]}${r}`, v ?? (filled && s.cos.length ? 'Abs' : null), { inp: true });
       } else {
         const src = `'${s.src[0]}'!${s.src[1]}${2 + i}`;
         cell(ws, `${scol[k]}${r}`, f(`IF(ISNUMBER(${src}),${src},IF(${src}="","","Abs"))`));
@@ -336,7 +336,7 @@ export async function courseWorkbook(info: CourseInfo, o: Outline, ids: number[]
   const tl = colL(j + 1), tv = colL(j + 2);
   hdr(ws, `${tl}1`, 'CO Attainment Threshold'); cell(ws, `${tv}1`, STUDENT_THRESHOLD, { fmt: '0%', inp: true });
   hdr(ws, `${tl}2`, 'PO Attainment Threshold'); cell(ws, `${tv}2`, STUDENT_THRESHOLD, { fmt: '0%', inp: true });
-  const LBL = `'${COM}'!$B$3:$${lastsc}$3`, MX = `'${MAP}'!$C$2:$C$${lastSlot}`;
+  const MX = `'${MAP}'!$C$2:$C$${lastSlot}`;
   const res = (m: Map<string, number | null> | undefined, k: string, used: boolean, thr: number): [V, V] => {
     if (!att || !m) return [undefined, undefined];
     if (!used) return ['NA', 'NA'];
@@ -346,12 +346,15 @@ export async function courseWorkbook(info: CourseInfo, o: Outline, ids: number[]
   ids.forEach((sid, i) => {
     const r = 3 + i, cr = 4 + i;
     cell(ws, `A${r}`, sid);
-    const MR = `'${COM}'!$B${cr}:$${lastsc}${cr}`;
     for (const c of cos) {
       const pc = pct.get(`co${c}`)!, yc = next(pc), cc = coCol.get(c)!;
       const TICK = `'${MAP}'!$${cc}$2:$${cc}$${lastSlot}`;
       const [rv, ry] = res(att?.studentCo, key(sid, c), !!att?.co.has(c), STUDENT_THRESHOLD);
-      cell(ws, `${pc}${r}`, f(`IF(SUMIF(${TICK},1,${MX})=0,"NA",IF(SUMPRODUCT((${LBL}="CO${c}")*ISNUMBER(${MR}))=0,"Abs",SUMIF(${LBL},"CO${c}",${MR})/SUMIF(${TICK},1,${MX})))`, rv as number | string | undefined), { fmt: '0.00%' });
+      // Marks of every item ticked for this CO (an item ticked for two COs counts for both) / their maximum.
+      const tick = (s: Slot) => `'${MAP}'!$${cc}$${s.row}=1`, mark = (k: number) => `'${COM}'!${scol[k]}${cr}`;
+      const got = slots.map((s, k) => `IF(${tick(s)},N(${mark(k)}),0)`).join('+');
+      const sat = slots.map((s, k) => `IF(AND(${tick(s)},ISNUMBER(${mark(k)})),1,0)`).join('+');
+      cell(ws, `${pc}${r}`, f(`IF(SUMIF(${TICK},1,${MX})=0,"NA",IF((${sat})=0,"Abs",(${got})/SUMIF(${TICK},1,${MX})))`, rv as number | string | undefined), { fmt: '0.00%' });
       cell(ws, `${yc}${r}`, f(`IF(ISNUMBER(${pc}${r}),IF(${pc}${r}>=$${tv}$1,"Y","N"),${pc}${r})`, ry as string | undefined));
     }
     for (const p of posUsed) {
@@ -451,10 +454,9 @@ function readMark(raw: string | number | null, sid: number, it: { name: string; 
   return m;
 }
 
-export function sessionalInputs(m: Marks, w: Warnings): { spec: Spec; data: Data; folders: FolderAssessment[] } {
-  for (const it of m.items) if (it.cos.length > 1) w.add(`'${it.name}' lists several COs; the workbook maps it to CO${it.cos[0]} only (the CAR uses all of them)`);
+export function sessionalInputs(m: Marks, _w?: Warnings): { spec: Spec; data: Data; folders: FolderAssessment[] } {
   const spec: Spec = { kind: 'sessional', items: m.items,
-    slots: m.items.map((it, k) => ({ group: 'Assessments', name: it.name, max: it.max, co: it.cos[0] ?? null, src: ['CA Marks', colL(2 + k)] })) };
+    slots: m.items.map((it, k) => ({ group: 'Assessments', name: it.name, max: it.max, cos: it.cos, src: ['CA Marks', colL(2 + k)] })) };
   const item = new Map<string, number | null>();
   m.ids.forEach((s) => m.items.forEach((_, k) => item.set(key(s, k), m.values.get(key(s, k)) ?? null)));
   const folders = m.items.map((it, k) => ({ folder: it.name, name: it.name, max: it.max, values: new Map(m.ids.map((s) => [s, m.values.get(key(s, k)) ?? null])) }));
@@ -491,12 +493,11 @@ export async function readTheoryWorkbook(data: ArrayBuffer | Uint8Array, info: C
     if (b.toUpperCase().startsWith('CO\\PO') || group.toLowerCase().startsWith('co-po')) break;
     if (!b) continue;
     const ticks = [...coCols].filter(([c]) => toMark(v(mp, [r, c])) === 1).map(([, co]) => co);
-    if (ticks.length > 1) w.add(`mapping: '${b}' is ticked for several COs; using CO${ticks[0]}`);
     const mx = toMark(v(mp, [r, 3]));
-    if (ticks.length && !mx) w.add(`mapping: '${b}' is ticked for CO${ticks[0]} but has no marks`);
+    if (ticks.length && !mx) w.add(`mapping: '${b}' is ticked for CO${ticks.join(', CO')} but has no marks`);
     const ct = b.match(/^CT\s*(\d+)/i);
     const src: [string, string] | null = ct && caCols.has(Number(ct[1])) ? ['CA Marks', colL(caCols.get(Number(ct[1]))!)] : null;
-    slots.push({ group, name: b, max: mx, co: ticks[0] ?? null, src, col: 2 + slots.length });
+    slots.push({ group, name: b, max: mx, cos: ticks, src, col: 2 + slots.length });
   }
   const caRow = new Map<number, number>();
   for (let r = 2; r <= ca.rowCount; r++) { const s = toId(v(ca, [r, 1])); if (s !== null) caRow.set(s, r); }
@@ -507,11 +508,11 @@ export async function readTheoryWorkbook(data: ArrayBuffer | Uint8Array, info: C
     for (const sid of ids) {
       let val: number | null;
       if (s.src) { const rr = caRow.get(sid); val = rr ? toMark(v(ca, `${s.src[1]}${rr}`)) : null; }
-      else val = s.co ? readMark(v(cm, [crow.get(sid)!, s.col]), sid, s, w) : toMark(v(cm, [crow.get(sid)!, s.col]));
+      else val = s.cos.length ? readMark(v(cm, [crow.get(sid)!, s.col]), sid, s, w) : toMark(v(cm, [crow.get(sid)!, s.col]));
       slot.set(key(sid, k), val);
     }
-    if (s.co && s.max) {
-      items.push({ name: s.name, cos: [s.co], max: s.max });
+    if (s.cos.length && s.max) {
+      items.push({ name: s.name, cos: s.cos, max: s.max });
       for (const sid of ids) values.set(key(sid, items.length - 1), slot.get(key(sid, k)) ?? null);
     }
   });
