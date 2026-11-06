@@ -202,7 +202,7 @@ export function mergeSiteCos(o: Outline, site: CO[]): Outline {
 }
 
 /** Course information when no course_information.xlsx is given: the outline's header and teachers, plus the roll range typed on the page. */
-export function infoFromOutline(o: Outline, a: { semester: string; batch: string; count: number; missingIds: string[]; courseType?: string }): CourseInfo {
+export function infoFromOutline(o: Outline, a: { semester: string; batch: string; count: number; missingIds: string[]; extraIds?: string[]; courseType?: string }): CourseInfo {
   const h = o.header;
   const credit = Number(h.credit);
   if (!o.courseNo) throw new Error('course outline: no "Course No:" / "Course Number:" found, so the course information workbook is needed');
@@ -212,7 +212,7 @@ export function infoFromOutline(o: Outline, a: { semester: string; batch: string
     extra: { batch: a.batch, ...(a.courseType ? { course_type: a.courseType } : {}) },
     faculties: o.teachers.map((t) => ({ name: t.name, section: '', office_room: t.room, email: t.email, telephone: t.phone, consultation: '' })),
     routine: o.routine,
-    sections: [{ section: '', first_roll: '1', last_roll: String(a.count), extra_ids: '', exclude_ids: a.missingIds.join(', ') }],
+    sections: [{ section: '', first_roll: '1', last_roll: String(a.count), extra_ids: (a.extraIds ?? []).join(', '), exclude_ids: a.missingIds.join(', ') }],
   };
 }
 

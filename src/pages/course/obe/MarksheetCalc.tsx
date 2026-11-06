@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Callout, Card, CardHeader, Dialog, Field, Input, useToast } from '@/components/ui';
 import { rpc, useWrite } from '@/lib/api';
-import { buildResultsWorkbook, buildTemplate, computeAttainment, coPoCodes, DEPT_CODE, mapFingerprint, marksheetColumns, parseMarksheet, parseMissing, studentIds,
+import { buildResultsWorkbook, buildTemplate, computeAttainment, coPoCodes, DEPT_CODE, mapFingerprint, marksheetColumns, parseIrregular, parseMarksheet, parseMissing, studentIds, withIrregular,
   type AttainmentResult, type Issue, type StudentResult, type Thresholds } from '@/lib/attainment';
 import { criteriaWarnings, fmtPct } from '@/lib/obe';
 import { YesNo, type ObeProps } from './shared';
@@ -13,9 +13,9 @@ const fileSafe = (s: string) => s.replace(/[^\w.-]+/g, '_');
 const errorsOf = (xs: Issue[]) => xs.filter((i) => i.level === 'error');
 const warningsOf = (xs: Issue[]) => xs.filter((i) => i.level === 'warning');
 // The batch, student count and missing rolls are remembered per offering in this browser, as a convenience.
-type Roll = { batch: string; count: string; missing: string };
+type Roll = { batch: string; count: string; missing: string; irregular: string };
 const rollKey = (id: string) => `marksheet-rolls:${id}`;
-const loadRoll = (id: string): Roll => { try { return { batch: '', count: '50', missing: '', ...JSON.parse(localStorage.getItem(rollKey(id)) ?? '{}') }; } catch { return { batch: '', count: '50', missing: '' }; } };
+const loadRoll = (id: string): Roll => { try { return { batch: '', count: '50', missing: '', irregular: '', ...JSON.parse(localStorage.getItem(rollKey(id)) ?? '{}') }; } catch { return { batch: '', count: '50', missing: '', irregular: '' }; } };
 
 /** Calculate CO and PO attainment from a filled marksheet. The template comes from the assessment map, so once the COs, mapping and
     assessment map are set, uploading the marks is all that is left. Marks are read here in the browser and never stored. */
@@ -30,7 +30,8 @@ export default function MarksheetCalc({ offering, course, data, obe, canEdit }: 
   const countN = Number(roll.count);
   const countOk = Number.isInteger(countN) && countN >= 1 && countN <= 999;
   const missing = useMemo(() => parseMissing(roll.missing, roll.batch.trim()), [roll.missing, roll.batch]);
-  const ids = useMemo(() => (batchOk && countOk ? studentIds(roll.batch.trim(), countN, missing.rolls) : []), [batchOk, countOk, roll.batch, countN, missing]);
+  const irregular = useMemo(() => parseIrregular(roll.irregular), [roll.irregular]);
+  const ids = useMemo(() => (batchOk && countOk ? withIrregular(studentIds(roll.batch.trim(), countN, missing.rolls), irregular.ids) : []), [batchOk, countOk, roll.batch, countN, missing, irregular]);
   const t: Thresholds = { studentCo: Number(offering.co_threshold ?? 0.4), cohortCo: Number(offering.cohort_threshold ?? 0.4),
     studentPo: Number(offering.po_threshold ?? 0.4), cohortPo: Number(offering.po_threshold ?? 0.4) };
   const columns = useMemo(() => marksheetColumns(obe.cos, obe.criteria, obe.criterionCos), [obe.cos, obe.criteria, obe.criterionCos]);
@@ -126,13 +127,14 @@ export default function MarksheetCalc({ offering, course, data, obe, canEdit }: 
               <Field label="Missing rolls" htmlFor="ms-missing"><Input id="ms-missing" placeholder="e.g. 7, 23, 41-42 or 2018007" value={roll.missing} onChange={(e) => setRoll({ missing: e.target.value })} /></Field>
               <Button icon={<Download className="size-4" aria-hidden />} disabled={!batchOk || !countOk || busy} loading={busy && !preview} onClick={downloadTemplate}>Marksheet template</Button>
             </div>
+            <Field label="Irregular students (full IDs)" htmlFor="ms-irregular" hint="Repeaters or students of other batches, added to the list."><Input id="ms-irregular" className="sm:max-w-md" placeholder="e.g. 1918045, 2018112" value={roll.irregular} onChange={(e) => setRoll({ irregular: e.target.value })} /></Field>
             <p className="text-muted">
               {batchOk && countOk && ids.length > 0
-                ? <>Student IDs <span className="font-mono">{ids[0]}</span> to <span className="font-mono">{ids[ids.length - 1]}</span>, {ids.length} students{missing.rolls.size > 0 && <> ({[...missing.rolls].filter((r) => r <= countN).length} missing left out)</>}. </>
+                ? <>Student IDs <span className="font-mono">{ids[0]}</span> to <span className="font-mono">{ids[ids.length - 1]}</span>, {ids.length} students{missing.rolls.size > 0 && <> ({[...missing.rolls].filter((r) => r <= countN).length} missing left out)</>}{irregular.ids.length > 0 && <>, including {irregular.ids.length} irregular</>}. </>
                 : <>Enter the batch to fill in the student IDs (batch + {DEPT_CODE} + roll, e.g. 20{DEPT_CODE}001). </>}
               {columns.length} {columns.length === 1 ? 'column' : 'columns'} from the assessment map, CO1–CO{obe.cos.length}, student threshold {t.studentCo * 100}%, cohort threshold {t.cohortCo * 100}%.
             </p>
-            {missing.bad.length > 0 && <p className="text-2xs text-warn">Not understood, ignored: {missing.bad.join(', ')}</p>}
+            {[...missing.bad, ...irregular.bad].length > 0 && <p className="text-2xs text-warn">Not understood, ignored: {[...missing.bad, ...irregular.bad].join(', ')}{irregular.bad.length > 0 && ' (irregular students need the full 7-digit ID)'}</p>}
           </div>}
           {ready && mapWarnings.length > 0 && <Callout tone="warn" title="Fix the assessment map first">
             <ul className="list-disc pl-5">{mapWarnings.slice(0, 6).map((w) => <li key={w}>{w}</li>)}</ul></Callout>}

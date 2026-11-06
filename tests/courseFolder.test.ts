@@ -266,6 +266,15 @@ describe("the department's outline layout", () => {
     expect(o.textbooks.length).toBe(2);
   });
 
+  it('adds irregular students (full IDs) to the roll range', async () => {
+    const src = { outline: await deptOutline(), mapping: await deptMapping(), roll: { semester: 'July 2025', batch: '21', count: 3, missingIds: ['2118002'], extraIds: ['1918045', '2018112'] } };
+    const t = await buildMarksTemplate(src);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(t.bytes as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet('ca')!;
+    expect([5, 6, 7, 8, 9].map((r) => ws.getCell(`A${r}`).value)).toEqual([1918045, 2018112, 2118001, 2118003, null]);
+  });
+
   it('matches assessment names to CO assessment tools without false hits', async () => {
     const o = (tools: string[]) => ({ cos: tools.map((t, i) => ({ no: i + 1, statement: '', pos: [], domain: '', delivery: '', tools: t })) }) as unknown as Outline;
     expect(cosFor(o(['Lab Test, Continuous Assessment', 'Lab Quiz, Continuous Assessment']), 'Class Participation and Continuous Assessment')).toEqual([1, 2]);

@@ -1,7 +1,7 @@
 import { Check, CheckCircle2, Download, FileArchive, FileSpreadsheet, FileText, FolderTree, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Badge, Button, Callout, Card, CardHeader, Field, Input, Spinner, useToast } from '@/components/ui';
-import { DEPT_CODE, parseMissing, studentIds as rollIds } from '@/lib/attainment';
+import { DEPT_CODE, parseIrregular, parseMissing, studentIds as rollIds, withIrregular } from '@/lib/attainment';
 import type { BuildResult, RollInput, Sources } from '@/lib/courseFolder/build';
 import { batchOf, isSessional, type CO, type CourseInfo, type Outline } from '@/lib/courseFolder/model';
 import { checkPlan, planCounts, type Plan } from '@/lib/courseFolder/plan';
@@ -69,7 +69,7 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
   const [mapping, setMapping] = useState<File | null>(null);
   const [marks, setMarks] = useState<File | null>(null);
   const [previous, setPrevious] = useState<File | null>(null);
-  const [roll, setRoll] = useState({ semester: termName ?? '', batch: '', count: '50', missing: '' });
+  const [roll, setRoll] = useState({ semester: termName ?? '', batch: '', count: '50', missing: '', irregular: '' });
   const [busy, setBusy] = useState<'template' | 'build' | 'blank' | null>(null);
   const [tplWarnings, setTplWarnings] = useState<string[] | null>(null);
   const [result, setResult] = useState<BuildResult | null>(null);
@@ -85,8 +85,9 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
   const rollOk = /^\d{2}$/.test(batch) && Number.isInteger(count) && count >= 1 && count <= 999;
   const termOk = !!info || !!roll.semester.trim();
   const missing = useMemo(() => parseMissing(roll.missing, batch), [roll.missing, batch]);
-  const rollInput: RollInput | null = rollOk ? { semester: roll.semester.trim(), batch, count, missingIds: [...missing.rolls].map((r) => `${batch}${DEPT_CODE}${String(r).padStart(3, '0')}`) } : null;
-  const ids = rollOk ? rollIds(batch, count, missing.rolls) : [];
+  const irregular = useMemo(() => parseIrregular(roll.irregular), [roll.irregular]);
+  const rollInput: RollInput | null = rollOk ? { semester: roll.semester.trim(), batch, count, missingIds: [...missing.rolls].map((r) => `${batch}${DEPT_CODE}${String(r).padStart(3, '0')}`), extraIds: irregular.ids } : null;
+  const ids = rollOk ? withIrregular(rollIds(batch, count, missing.rolls), irregular.ids) : [];
 
   const sources = async (): Promise<Sources> => ({ outline: await outline!.arrayBuffer(), mapping: mapping ? await mapping.arrayBuffer() : null,
     info: info ? await info.arrayBuffer() : null, roll: rollInput, siteCos });
@@ -179,9 +180,10 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
                 <Field label="Batch" htmlFor="cf-batch"><Input id="cf-batch" className="h-8" inputMode="numeric" maxLength={2} placeholder="e.g. 22" value={roll.batch} onChange={(e) => setRoll({ ...roll, batch: e.target.value.replace(/\D/g, '') })} /></Field>
                 <Field label="Number of students" htmlFor="cf-count"><Input id="cf-count" className="h-8" type="number" min={1} max={999} value={roll.count} onChange={(e) => setRoll({ ...roll, count: e.target.value })} /></Field>
                 <Field label="Missing rolls" htmlFor="cf-missing"><Input id="cf-missing" className="h-8" placeholder="e.g. 7, 23, 41-42" value={roll.missing} onChange={(e) => setRoll({ ...roll, missing: e.target.value })} /></Field>
+                <Field className="col-span-2" label="Irregular students (full IDs)" htmlFor="cf-irregular" hint="Repeaters or students of other batches, added to the list."><Input id="cf-irregular" className="h-8" placeholder="e.g. 1918045, 2018112" value={roll.irregular} onChange={(e) => setRoll({ ...roll, irregular: e.target.value })} /></Field>
               </div>
-              <p className="text-2xs text-muted">{rollOk && ids.length ? <>Student IDs <span className="font-mono">{ids[0]}</span> to <span className="font-mono">{ids[ids.length - 1]}</span>, {ids.length} students.</> : (info ? 'Enter the batch.' : 'Enter the term and batch.')}
-                {missing.bad.length > 0 && <span className="text-warn"> Not understood: {missing.bad.join(', ')}</span>}</p>
+              <p className="text-2xs text-muted">{rollOk && ids.length ? <>Student IDs <span className="font-mono">{ids[0]}</span> to <span className="font-mono">{ids[ids.length - 1]}</span>, {ids.length} students{irregular.ids.length > 0 && <> (including {irregular.ids.length} irregular)</>}.</> : (info ? 'Enter the batch.' : 'Enter the term and batch.')}
+                {[...missing.bad, ...irregular.bad].length > 0 && <span className="text-warn"> Not understood: {[...missing.bad, ...irregular.bad].join(', ')}{irregular.bad.length > 0 && ' (irregular students need the full 7-digit ID)'}</span>}</p>
             </div>
             <div className="flex flex-wrap gap-2 pt-1">
               <a className="inline-flex items-center justify-center gap-1.5 rounded font-medium whitespace-nowrap h-8 px-2.5 text-sm bg-surface text-ink border border-line-strong hover:bg-sunken transition-colors duration-150" href={outlineTemplateUrl} download="course_outline_template.docx">

@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { describe, expect, it } from 'vitest';
-import { buildResultsWorkbook, buildTemplate, computeAttainment, coPoCodes, mapFingerprint, marksheetColumns, parseMarksheet, parseMissing, studentIds, type MarkColumn, type StudentMarks } from '../src/lib/attainment';
+import { buildResultsWorkbook, buildTemplate, computeAttainment, coPoCodes, mapFingerprint, marksheetColumns, parseIrregular, parseMarksheet, parseMissing, studentIds, withIrregular, type MarkColumn, type StudentMarks } from '../src/lib/attainment';
 import type { CriterionCo, ObeCriterion } from '../src/lib/types';
 
 const T = { studentCo: 0.4, cohortCo: 0.4, studentPo: 0.4, cohortPo: 0.4 };
@@ -99,6 +99,12 @@ describe('marksheet template', () => {
     const aoa = XLSX.utils.sheet_to_json<unknown[]>(buildTemplate(XLSX, { title: 'x', columns: cols, studentIds: ids }).Sheets.Marks, { header: 1, defval: null });
     expect(aoa[5]).toEqual(['Student ID', ...cols.map(() => null)]); // no Name column
     expect(aoa[6][0]).toBe('2018001');
+  });
+
+  it('adds irregular students by full ID', () => {
+    const x = parseIrregular('1918045, 2018112 2018112 45 abc');
+    expect(x).toEqual({ ids: ['1918045', '2018112'], bad: ['45', 'abc'] });
+    expect(withIrregular(studentIds('20', 3), x.ids)).toEqual(['1918045', '2018001', '2018002', '2018003', '2018112']);
   });
 
   it('still reads an older template with a Name column', () => {

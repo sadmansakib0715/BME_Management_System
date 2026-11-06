@@ -66,6 +66,16 @@ export function parseMissing(text: string, batch: string, dept = DEPT_CODE): { r
   return { rolls, bad };
 }
 
+/** Irregular students (repeaters, students from other batches) typed as full IDs: "1918045, 2018112". */
+export function parseIrregular(text: string): { ids: string[]; bad: string[] } {
+  const ids = new Set<string>(), bad: string[] = [];
+  for (const tok of text.split(/[\s,;]+/).filter(Boolean)) (/^\d{7}$/.test(tok) ? ids.add(tok) : bad.push(tok));
+  return { ids: [...ids].sort(), bad };
+}
+
+/** The batch's IDs plus the irregular students, sorted, each once. */
+export const withIrregular = (ids: string[], extra: string[]) => [...new Set([...ids, ...extra])].sort();
+
 /** Student IDs of a batch: batch (2 digits) + department code + 3-digit roll, rolls 1…count without the missing ones.
     Batch 20, 50 students → 2018001 … 2018050. */
 export function studentIds(batch: string, count: number, missing: Set<number> = new Set(), dept = DEPT_CODE): string[] {

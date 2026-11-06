@@ -25,7 +25,7 @@ export interface BuildResult {
 }
 
 /** Roll range typed on the page when there is no course_information.xlsx (student IDs = batch + 18 + roll). */
-export interface RollInput { semester: string; batch: string; count: number; missingIds: string[] }
+export interface RollInput { semester: string; batch: string; count: number; missingIds: string[]; /** irregular students, full IDs */ extraIds?: string[] }
 /** What the faculty gives: the course outline (required), the CO-PO Mapping.docx when the outline has no CO table, the course
     information workbook or else the roll range, and the website's COs for this course as a last source of the CO-PO mapping. */
 export interface Sources { outline: Bytes; mapping?: Bytes | null; info?: Bytes | null; roll?: RollInput | null; siteCos?: CO[] }
@@ -34,7 +34,7 @@ export interface Sources { outline: Bytes; mapping?: Bytes | null; info?: Bytes 
 function withRoll(info: CourseInfo, roll: RollInput, w: Warnings): CourseInfo {
   const before = info.sections.some((x) => x.first_roll || x.extra_ids) ? studentIds(info) : [];
   const out: CourseInfo = { ...info, extra: { ...info.extra, batch: roll.batch },
-    sections: [{ section: info.sections.map((x) => clean(x.section)).filter(Boolean).join(', '), first_roll: '1', last_roll: String(roll.count), extra_ids: '', exclude_ids: roll.missingIds.join(', ') }] };
+    sections: [{ section: info.sections.map((x) => clean(x.section)).filter(Boolean).join(', '), first_roll: '1', last_roll: String(roll.count), extra_ids: (roll.extraIds ?? []).join(', '), exclude_ids: roll.missingIds.join(', ') }] };
   const after = studentIds(out);
   if (before.length && (before.length !== after.length || before.some((x, i) => x !== after[i])))
     w.add(`the course information's sections sheet lists ${before.length} students (${before[0]} to ${before[before.length - 1]}); the marks sheet uses the ${after.length} entered on this page`);
