@@ -112,7 +112,7 @@ function readHeaderLine(raw: string, h: Outline['header']) {
     The CO-PO mapping (POs, assessment tools) may instead come from the department's CO-PO Mapping.docx: see `mergeMapping`. */
 export async function readOutline(data: ArrayBuffer | Uint8Array, opts: { requireCos?: boolean } = {}): Promise<Outline> {
   const pkg = await DocxPackage.open(data);
-  const o: Outline = { courseNo: '', title: '', cos: [], coTable: null, kpaTable: null, planHeader: [], plan: [], distribution: [], textbooks: [], header: {}, teachers: [], routine: [] };
+  const o: Outline = { courseNo: '', title: '', cos: [], coTable: null, kpaTable: null, planHeader: [], plan: [], distribution: [], textbooks: [], header: {}, teachers: [], routine: [], contents: [], objectives: [] };
   const listCos: string[] = [];
   let current = '';
   for (const el of pkg.blocks()) {
@@ -135,6 +135,8 @@ export async function readOutline(data: ArrayBuffer | Uint8Array, opts: { requir
         const d = raw.trim().match(/^(.*?)[\s\t:]+(\d+(?:\.\d+)?)\s*%/);
         if (d && clean(d[1]) && !/^total\b/i.test(d[1].trim())) o.distribution.push(distItem(d[1], Number(d[2])));
       } else if (current === 'textbooks') o.textbooks.push(txt);
+      else if (current === 'content') o.contents.push(txt);
+      else if (current === 'objectives' && !/:\s*$/.test(txt)) o.objectives.push(txt.replace(/^\s*[•●○◦▪■\-–*]\s+/, ''));
       else if (current === 'outcomes' && !/:\s*$/.test(txt)) listCos.push(txt.replace(/^(CO\s*-?\s*\d+|\d+)\s*[.):-]\s*/i, ''));
     } else {
       const rows = kids(el, 'tr').map((tr) => kids(tr, 'tc').map((tc) => clean(cellText(tc).replace(/\n/g, ' / '))));

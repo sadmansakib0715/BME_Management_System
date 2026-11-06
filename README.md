@@ -139,6 +139,13 @@ problems, A1 for POs on complex engineering activities (`impliedKpa` in `src/lib
    course's page the website's own COs and mapping fill in otherwise. **course_information.xlsx** is optional (sheets `info`, `faculties`,
    `routine`, `sections`): it is checked against the outline (course no, credit hours, level/term, session; the outline's credit hours win). Without
    it, type the term, batch, number of students and missing rolls.
+   **Outline in another layout?** *Convert it to the department template* opens the outline converter: the teacher's outline (.docx or
+   .pdf) on the left, the department template on the right, filled in as far as the headings allow. Select text on the left (or drag a whole
+   paragraph or table by its handle) and drop it on a part of the template: bullets and numbers become list items, “Lab test (x2): 40%” an
+   assessment row, “3 Topic” or a table row a schedule row, a teachers table its rows (names, rooms, emails, phones; the routine apart).
+   Every part can be typed in. **Download outline (.docx)** or **Use in course folder**. Code: `src/lib/outlineDraft.ts` (drop rules),
+   `outlineAutoFill.ts`, `outlineDocx.ts` (the Word file), `sourceDoc.ts` (reading .docx / .pdf), `src/pages/obe/OutlineConverter.tsx`.
+   Scanned PDFs have no text and cannot be read; a PDF's weekly schedule usually needs tidying.
 2. Beside the uploads the page shows what was read (course details, teachers, COs with their POs and tools) and the **assessment tree**: each
    assessment from the outline with its weight, its marks (credit hours × 100 × weight) and the COs whose Assessment Tool(s) name it. It can be
    edited: rename, change a weight, tick COs, add or remove assessments.
