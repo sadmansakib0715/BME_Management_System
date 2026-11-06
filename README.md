@@ -104,6 +104,18 @@ The database queues messages when a step unlocks, a paper is returned for correc
 deadlines (then daily while overdue, up to five days).
 
 
+### Department document templates (0016)
+
+The PDFs follow the department's Word templates in `Templates/` (US Letter, 2.5 cm margins, BUET crest): **Course Outline**
+(teachers' table with class routine, numbered COs, Assessment, Textbooks, Weekly Schedule, Prepared by), **CO-PO Mapping**
+(CO table + Knowledge Profile/CEP/CEA table), **CAR** (Parts A–E, current term first, then the previous one), **Basic information**,
+**Instructors & schedule**, the **Question Moderation Form** (Assessment map → term-final rows, Sections A/B) and
+**CO and PO Attainment for <course>.xlsx** (CAR page). 0016 adds the academic session and class routine to the outline;
+existing databases run `supabase/update_obe_schema.sql` once.
+
+Mapping a CO to a PO ticks the K/P/A table: the PO's knowledge profiles (`pos.k_profiles`), P1 for POs on complex engineering
+problems, A1 for POs on complex engineering activities (`impliedKpa` in `src/lib/obe.ts`). “Tick from mapping” fills existing COs.
+
 ### OBE documents and attainment from marks (0015)
 
 | Step | Where | What the teacher gets |

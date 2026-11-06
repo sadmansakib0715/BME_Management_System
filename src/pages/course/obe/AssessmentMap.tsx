@@ -1,4 +1,4 @@
-import { Copy, Plus, Printer, Trash2 } from 'lucide-react';
+import { Copy, FileDown, Plus, Printer, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ConnectBoard from '@/components/ConnectBoard';
@@ -7,15 +7,20 @@ import { must, rpc, useWrite } from '@/lib/api';
 import { ASSESSMENTS, byAssessment, coCoverage, criteriaWarnings } from '@/lib/obe';
 import { supabase } from '@/lib/supabase';
 import type { ObeCriterion } from '@/lib/types';
+import { useTerm } from '@/lib/TermContext';
+import { moderationSections, save as saveFile } from './docData';
 import { Chips, PctBar, type ObeProps } from './shared';
+import { useCourseInfo } from './useDocInputs';
 
 type Row = { key: string; id?: string; assessment: string; label: string; max: string; cos: string[] };
 const newKey = () => crypto.randomUUID();
 
 /** Assessment map: every exam question part or marking criterion with its marks and the COs it assesses — the item-to-CO sheet of the
     CO-PO-Assessment workbook, without student marks. Rubric bands for presentations, demos and reports are written under Rubrics. */
-export default function AssessmentMap({ offering, course, obe, canEdit }: ObeProps) {
+export default function AssessmentMap({ offering, course, data, obe, canEdit }: ObeProps) {
   const toast = useToast();
+  const info = useCourseInfo({ offering, course, data, obe });
+  const { nameOf } = useTerm();
   const initial = useMemo<Row[]>(() => obe.criteria.map((c) => ({ key: c.id, id: c.id, assessment: c.assessment, label: c.label, max: String(Number(c.max_marks)),
     cos: obe.criterionCos.filter((l) => l.criterion_id === c.id).map((l) => l.co_id) })), [obe.criteria, obe.criterionCos]);
   const [rows, setRows] = useState<Row[]>(initial);
@@ -59,6 +64,16 @@ export default function AssessmentMap({ offering, course, obe, canEdit }: ObePro
   });
   const renameGroup = (from: string, to: string) => setRows((x) => x.map((r) => (r.assessment === from ? { ...r, assessment: to } : r)));
   const docs = obe.docs;
+  const finals = rows.filter((r) => /final/i.test(r.assessment));
+  /** Question Moderation Form (department template) from the term-final rows, with the question setters of sections A and B. */
+  const moderationPdf = async () => {
+    const { moderationPdf: build } = await import('@/lib/pdf/obeDocs');
+    const exam = data.exam.find((e) => e.offering_id === offering.id);
+    const all = info.teachers.map((t) => t.name).join(', ');
+    const setter = (id: string | null | undefined) => (id ? nameOf(id) : all);
+    saveFile(build({ course: info, sections: moderationSections(rows, obe.cos, { A: setter(exam?.qp_a), B: setter(exam?.qp_b), all }) }),
+      `${course.code} Question moderation form ${data.term.name}.pdf`);
+  };
   const saveButton = canEdit && <Button size="sm" variant="primary" disabled={!dirty || bad.length > 0} loading={save.isPending}
     onClick={() => save.mutate(rows, { onSuccess: () => toast('ok', 'Assessment map saved'), onError: (e) => toast('bad', e.message) })}>Save</Button>;
 
@@ -74,6 +89,8 @@ export default function AssessmentMap({ offering, course, obe, canEdit }: ObePro
             {canEdit && !rows.length && obe.prev && <Button size="sm" icon={<Copy className="size-4" aria-hidden />} loading={fill.isPending}
               onClick={() => fill.mutate(undefined, { onSuccess: (r) => toast('ok', r.criteria ? `${r.criteria} rows copied from ${obe.prev!.termName}` : `${obe.prev!.termName} has no assessment map to copy`), onError: (e) => toast('bad', e.message) })}>
               Fill from {obe.prev.termName}</Button>}
+            <Button size="sm" icon={<FileDown className="size-4" aria-hidden />} disabled={!finals.length} title={finals.length ? 'Question Moderation Form for the term final' : 'Add a Term Final group with its question parts first'}
+              onClick={() => moderationPdf().catch((e) => toast('bad', e.message))}>Moderation form PDF</Button>
             <Button size="sm" icon={<Printer className="size-4" aria-hidden />} onClick={() => window.print()}>Print</Button>
             {saveButton}
           </>} />

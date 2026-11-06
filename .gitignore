@@ -12,3 +12,10 @@ __pycache__/
 *.csv
 supabase/.temp/
 supabase/.branches/
+
+# TypeScript output: the app is built by Vite; tsc only type-checks.
+src/**/*.js
+tests/**/*.js
+vite.config.js
+vitest.config.js
+*.tsbuildinfo

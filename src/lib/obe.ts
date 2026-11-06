@@ -46,6 +46,27 @@ export function kProfiles(po: Pick<PO, 'k_profiles'>): string[] {
   return s.match(/K\d/g) ?? [];
 }
 
+const KPA_ORDER = KPA.flatMap((g) => g.items.map(([k]) => k));
+/** K/P/A codes in table order (K1…K8, P1…P7, A1…A5). */
+export const sortKpa = (xs: string[]) => [...new Set(xs)].sort((a, b) => KPA_ORDER.indexOf(a) - KPA_ORDER.indexOf(b));
+
+/** What mapping a CO to this PO ticks in the “Mapping of Knowledge Profile, CEP and CEA” table:
+    the PO's knowledge profiles (BAETE, e.g. PO1 → K1–K4), P1 when the PO is about solving complex engineering problems
+    (P1, depth of knowledge, is the one attribute every complex problem has), and A1 when it is about complex engineering activities.
+    Matches how the department's own mapping documents tick them. */
+export function impliedKpa(po: Pick<PO, 'k_profiles'> & { statement?: string | null }): string[] {
+  const s = po.statement ?? '';
+  return sortKpa([...kProfiles(po), ...(/complex[\w\s-]*problems?/i.test(s) ? ['P1'] : []), ...(/complex[\w\s-]*activit/i.test(s) ? ['A1'] : [])]);
+}
+
+/** A CO's K/P/A ticks after its POs change from `before` to `after`: ticks newly implied are added, ticks no longer implied by any
+    remaining PO are removed, and ticks the teacher set by hand otherwise stay. */
+export function kpaAfterPoChange(kpa: string[], before: string[], after: string[], pos: (Pick<PO, 'code' | 'k_profiles'> & { statement?: string | null })[]): string[] {
+  const implied = (codes: string[]) => new Set(codes.flatMap((c) => { const p = pos.find((x) => x.code === c); return p ? impliedKpa(p) : []; }));
+  const was = implied(before), now = implied(after);
+  return sortKpa([...kpa.filter((k) => !was.has(k) || now.has(k)), ...[...now].filter((k) => !was.has(k))]);
+}
+
 /** Attained on the unrounded value, with ≥ (SAR §8.4). value and threshold: value in %, threshold as a fraction. */
 export const attained = (value: number | null | undefined, threshold = DEFAULT_THRESHOLD) => value === null || value === undefined ? null : value >= threshold * 100;
 /** Within 10 points above the threshold: the CAR asks for a comment (spec section 9). */

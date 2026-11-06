@@ -38,12 +38,14 @@ export interface CqiItem { id: string; loop: 'CO' | 'PO' | 'PEO'; source: 'CAR' 
   finding: string; action: string | null; owner: string | null; resolution_id: string | null; effective_term: string | null; status: CqiStatus; created_at: string; }
 export interface ProgramPo { batch: string; po_code: string; value: number; courses: number; course_codes: string[]; }
 // ---------------------------------------------------------------- OBE master data (0013): outline & documents, assessment map with rubrics
-export interface Instructor { name: string; room?: string; email?: string }
+export interface Instructor { name: string; room?: string; email?: string; phone?: string }
 export interface ObeDocs { offering_id: string; contents: string | null; objectives: string | null; outline_text: string | null; instructors: Instructor[];
   marks_distribution: { component: string; percent: number }[]; components: { component: string; weight: number; marks: number }[];
   source: { folder?: string; files?: Record<string, string>; car_text?: string | null }; issues: string[]; copied_from: string | null; updated_at: string;
   /** 0015: outline fields for the outline PDF. */
-  assessment_strategy?: string | null; textbooks?: string | null; lecture_plan?: { lectures: string; topic: string; cos: string }[] }
+  assessment_strategy?: string | null; textbooks?: string | null; lecture_plan?: { lectures: string; topic: string; cos: string }[];
+  /** 0016: the rest of the outline template's header. */
+  academic_session?: string | null; class_routine?: string | null }
 /** One question part or marking criterion of the assessment map, tagged to COs through obe_criterion_cos. */
 export interface ObeCriterion { id: string; offering_id: string; assessment: string; label: string; max_marks: number; sort: number; }
 export interface CriterionCo { criterion_id: string; co_id: string; }
