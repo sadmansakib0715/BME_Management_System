@@ -41,6 +41,12 @@ export interface Outline {
   plan: string[][];
   distribution: { name: string; pct: number }[];
   textbooks: string[];
+  /** The department outline's header block: Course No, Title, Credit / Contact hours, Level/Term, Academic Session. */
+  header: { courseNo?: string; title?: string; credit?: string; contact?: string; level?: string; term?: string; session?: string };
+  /** Course Teacher(s) table. */
+  teachers: { name: string; room: string; email: string; phone: string }[];
+  /** Class routine from the teachers table (section, day, start_time, end_time). */
+  routine: Rec[];
 }
 
 export interface Item { name: string; cos: number[]; max: number }
@@ -146,31 +152,6 @@ export function studentIds(info: CourseInfo): number[] {
     for (const x of (s.exclude_ids ?? '').match(/\d{5,}/g) ?? []) excl.add(Number(x));
   }
   return [...new Set(ids)].filter((i) => !excl.has(i)).sort((a, c) => a - c);
-}
-
-/** Sessional columns: one per Distribution of Marks entry, CO matched from the CO table's Assessment Tool(s), sorted by CO. */
-export function planSessionalItems(info: CourseInfo, o: Outline, w: Warnings): Item[] {
-  if (!o.distribution.length) throw new Error("course outline: the 'Distribution of Marks' section is missing or empty");
-  const total = Math.round(info.credit * 100 * 100) / 100;
-  const rows: { co: number; idx: number; item: Item }[] = [];
-  o.distribution.forEach(({ name, pct }, idx) => {
-    const k = norm(name);
-    const cos = o.cos.filter((c) => { const t = norm(c.tools); return !!k && (t.includes(k) || (!!t && k.includes(t))); }).map((c) => c.no);
-    const mx = Math.round(total * pct) / 100;
-    if (!cos.length) {
-      w.add(`assessment '${name}' is not named in any CO's Assessment Tool(s); fill its CO in row 2 of the marks sheet`);
-      rows.push({ co: 99, idx, item: { name, cos: [], max: mx } });
-    } else if (cos.length === 1) {
-      rows.push({ co: cos[0], idx, item: { name, cos, max: mx } });
-    } else {
-      const share = Math.round((mx / cos.length) * 100) / 100;
-      cos.forEach((c, j) => rows.push({ co: c, idx, item: { name: `${name} (CO${c})`, cos: [c], max: j < cos.length - 1 ? share : Math.round((mx - share * (cos.length - 1)) * 100) / 100 } }));
-      w.add(`assessment '${name}' maps to CO${cos.join(', CO')}: split into equal columns (edit the maxima if needed)`);
-    }
-  });
-  const sum = rows.reduce((a, r) => a + r.item.max, 0);
-  if (Math.abs(sum - total) > 0.01) w.add(`the distribution adds to ${fmtNum(sum)} marks, expected ${fmtNum(total)} (credit ${info.credit} × 100)`);
-  return rows.sort((a, b) => a.co - b.co || a.idx - b.idx).map((r) => r.item);
 }
 
 // ------------------------------------------------------------------ attainment

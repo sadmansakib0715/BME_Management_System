@@ -2,11 +2,12 @@
 // laid out like the department's BME 211 (theory) and BME 310 (sessional) folders.
 import JSZip from 'jszip';
 import { carDocx, coPoMappingDocx, instructorsDocx, reportDocx } from './docs';
-import { readCourseInfo, readOutline } from './inputs';
+import { checkInfo, infoFromOutline, loadWorkbook, mergeMapping, mergeSiteCos, readCourseInfo, readOutline } from './inputs';
 import {
-  clean, computeAttainment, fmtNum, fmtPct, initials, isSessional, norm, safeName, sampleStats, studentIds,
-  type Attainment, type CourseInfo, type Marks, type Outline, type Sample, Warnings,
+  clean, computeAttainment, fmtNum, fmtPct, initials, isSessional, safeName, sampleStats, studentIds,
+  type Attainment, type CO, type CourseInfo, type Marks, type Outline, type Sample, Warnings,
 } from './model';
+import { planFromOutline, type Plan } from './plan';
 import { courseWorkbook, marksTemplate, readPrevious, readSessionalMarks, readTheoryWorkbook, sessionalInputs } from './workbook';
 
 export type Bytes = ArrayBuffer | Uint8Array;
@@ -23,25 +24,52 @@ export interface BuildResult {
   files: string[];
 }
 
-/** Stage 1: the blank marks sheet for the faculty to download. */
-export async function buildMarksTemplate(infoFile: Bytes, outlineFile: Bytes) {
+/** Roll range typed on the page when there is no course_information.xlsx (student IDs = batch + 18 + roll). */
+export interface RollInput { semester: string; batch: string; count: number; missingIds: string[] }
+/** What the faculty gives: the course outline (required), the CO-PO Mapping.docx when the outline has no CO table, the course
+    information workbook or else the roll range, and the website's COs for this course as a last source of the CO-PO mapping. */
+export interface Sources { outline: Bytes; mapping?: Bytes | null; info?: Bytes | null; roll?: RollInput | null; siteCos?: CO[] }
+
+/** Reads and cross-checks the inputs. */
+export async function readSources(s: Sources, w: Warnings): Promise<{ info: CourseInfo; outline: Outline }> {
+  let outline = await readOutline(s.outline);
+  if (s.mapping) outline = await mergeMapping(outline, s.mapping, w);
+  if (s.siteCos?.length) outline = mergeSiteCos(outline, s.siteCos);
+  if (!outline.cos.some((c) => c.pos.length)) w.add('no CO-PO mapping found: add the CO-PO Mapping.docx (or set the mapping on the OBE page), otherwise PO attainment cannot be worked out');
+  let info: CourseInfo;
+  if (s.info) info = checkInfo(await readCourseInfo(s.info), outline, w);
+  else if (s.roll) info = infoFromOutline(outline, s.roll);
+  else throw new Error('give the course information workbook, or the batch and number of students');
+  return { info, outline };
+}
+
+/** What the page shows before the download: the inputs as read, the assessment tree, and anything to check. */
+export async function previewSources(s: Sources) {
   const w = new Warnings();
-  const info = await readCourseInfo(infoFile);
-  const outline = await readOutline(outlineFile);
-  const bytes = await marksTemplate(info, outline, w);
-  return { bytes, fileName: `${info.courseNo} marks (${info.semester}).xlsx`, info, outline, warnings: w.list, sessional: isSessional(info) };
+  const { info, outline } = await readSources(s, w);
+  const plan = planFromOutline(info, outline, w);
+  return { info, outline, plan, warnings: w.list };
+}
+
+/** Stage 1: the blank marks sheet for the faculty to download, from the assessment tree (as edited on the page). */
+export async function buildMarksTemplate(s: Sources, plan?: Plan) {
+  const w = new Warnings();
+  const { info, outline } = await readSources(s, w);
+  const p = plan ?? planFromOutline(info, outline, w);
+  const bytes = await marksTemplate(info, outline, w, p);
+  return { bytes, fileName: `${info.courseNo} marks (${info.semester}).xlsx`, info, outline, plan: p, warnings: w.list, sessional: isSessional(info) };
 }
 
 /** Stage 2: the course folder. */
-export async function buildCourseFolder(a: { info: Bytes; outline: Bytes; marks: Bytes; previous?: Bytes | null; templates: Templates }): Promise<BuildResult> {
+export async function buildCourseFolder(a: Sources & { marks: Bytes; previous?: Bytes | null; templates: Templates }): Promise<BuildResult> {
   const w = new Warnings();
-  const info = await readCourseInfo(a.info);
-  const outline = await readOutline(a.outline);
+  const { info, outline } = await readSources(a, w);
   const cno = info.courseNo;
-  if (outline.courseNo && norm(outline.courseNo) !== norm(cno)) w.add(`the outline is for '${outline.courseNo}' but the course information says '${cno}'`);
 
   let marks: Marks, spec, data, folders;
-  if (isSessional(info)) {
+  // The uploaded sheet says which layout it is: the one-sheet `ca` layout, or the theory workbook.
+  const book = await loadWorkbook(a.marks);
+  if (book.getWorksheet('ca')) {
     marks = await readSessionalMarks(a.marks, outline, w);
     ({ spec, data, folders } = sessionalInputs(marks, w));
   } else {

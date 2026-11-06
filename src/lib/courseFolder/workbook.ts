@@ -3,9 +3,10 @@
 import ExcelJS from 'exceljs';
 import { loadWorkbook, plain } from './inputs';
 import {
-  clean, COHORT_THRESHOLD, fmtNum, isAbsentToken, isSessional, key, levelTerm, MAX_PO, parseNums, planSessionalItems, STUDENT_THRESHOLD, studentIds, toId, toMark,
+  clean, COHORT_THRESHOLD, fmtNum, isAbsentToken, key, levelTerm, MAX_PO, parseNums, STUDENT_THRESHOLD, studentIds, toId, toMark,
   type Attainment, type CourseInfo, type Item, type Marks, type Outline, Warnings,
 } from './model';
+import { planColumns, planFromOutline, theoryWeights, type Plan } from './plan';
 
 export const MAP = 'Assessment-CO Mapping';
 export const COM = 'CO Marks';
@@ -19,7 +20,7 @@ export interface Spec {
   slots: Slot[];
   items?: Item[];                     // sessional
   faculty?: string[]; attEach?: number; attTotal?: number;   // theory
-  nCt?: number; best?: number; ctMax?: number; tfSection?: number;
+  nCt?: number; best?: number; ctMax?: number; tfSection?: number; att?: number; ca?: number; tf?: number;
 }
 /** Filled values (all keyed `${sid}:${index}`); null = absent. */
 export interface Data {
@@ -63,14 +64,6 @@ function validateMarks(ws: ExcelJS.Worksheet, col: string, first: number, last: 
       formulae: [`OR(UPPER(${a})="ABS",UPPER(${a})="ABSENT",AND(ISNUMBER(${a}),${a}>=0,${a}<=${maxRef}))`] };
   }
 }
-/** Highest / Lowest / Average flag beside a mark column (the BME 211 array formula). */
-function position(ws: ExcelJS.Worksheet, X: string, row: number, first: number, last: number, hi: number, lo: number, av: number) {
-  const t = `${next(X)}${row}`;
-  ws.getCell(t).value = { formula: `IF(NOT(ISNUMBER(${X}${row})),"",IF(${X}${row}=$${X}$${hi},"Highest",IF(${X}${row}=$${X}$${lo},"Lowest",`
-    + `IF(ABS(${X}${row}-$${X}$${av})=MIN(IF(ISNUMBER($${X}$${first}:$${X}$${last}),ABS($${X}$${first}:$${X}$${last}-$${X}$${av}))),"Average",""))))`,
-    shareType: 'array', ref: t } as unknown as ExcelJS.CellFormulaValue;
-  cell(ws, t);
-}
 function statsRows(ws: ExcelJS.Worksheet, cols: string[], first: number, last: number): [number, number, number] {
   const hi = last + 2, lo = last + 3, av = last + 4;
   for (const [lab, r, fn] of [['Highest', hi, 'MAX'], ['Lowest', lo, 'MIN'], ['Average', av, 'AVERAGE']] as const) {
@@ -82,13 +75,16 @@ function statsRows(ws: ExcelJS.Worksheet, cols: string[], first: number, last: n
 const markOut = (v: number | null | undefined, filled: boolean, absent = 'Absent'): V => (v === null || v === undefined ? (filled ? absent : null) : v);
 
 // ------------------------------------------------------------------ theory plan
-export function theorySpec(info: CourseInfo, o: Outline, w: Warnings): Spec {
-  let att: number | null = null, ca: number | null = null, tf: number | null = null;
-  for (const { name, pct } of o.distribution) {
+/** Weights (%) of attendance, class tests and term final, and the class tests' CO when the outline gives one. */
+export interface TheoryWeights { att: number; ca: number; tf: number; ctCo?: number | null }
+
+export function theorySpec(info: CourseInfo, o: Outline, w: Warnings, weights?: TheoryWeights): Spec {
+  let att: number | null = weights?.att ?? null, ca: number | null = weights?.ca ?? null, tf: number | null = weights?.tf ?? null;
+  if (!weights) for (const { name, pct } of o.distribution) {
     const n = name.toLowerCase();
-    if (/attend|participation/.test(n)) att = pct;
-    else if (/final/.test(n)) tf = pct;
-    else if (/class\s*test|\bct\b|continuous|quiz|homework|assignment/.test(n)) ca = pct;
+    if (/class\s*test|\bct\b|continuous/.test(n)) ca = (ca ?? 0) + pct;
+    else if (/final/.test(n)) tf = (tf ?? 0) + pct;
+    else if (/attend|participation/.test(n)) att = (att ?? 0) + pct;
   }
   if (att === null || ca === null || tf === null) { w.add('theory marks distribution not fully recognised in the outline; using 10% / 20% / 70%'); att ??= 10; ca ??= 20; tf ??= 70; }
   const total = info.credit * 100;
@@ -99,21 +95,23 @@ export function theorySpec(info: CourseInfo, o: Outline, w: Warnings): Spec {
   if (!faculty.length) faculty.push('Faculty 1');
   const attTotal = (total * att) / 100;
   return {
-    kind: 'theory', faculty, attTotal, attEach: Math.round((attTotal / faculty.length) * 100) / 100, nCt, best, ctMax,
+    kind: 'theory', att, ca, tf, faculty, attTotal, attEach: Math.round((attTotal / faculty.length) * 100) / 100, nCt, best, ctMax,
     tfSection: Math.round(((total * tf) / 100 / 2) * 100) / 100,
     slots: [
       ...TF_SLOTS.map((s): Slot => ({ group: 'Term Final', name: s, max: null, co: null, src: null })),
-      ...Array.from({ length: nCt }, (_, k): Slot => ({ group: 'Class Tests (optional)', name: `CT${String(k + 1).padStart(2, '0')}`, max: ctMax, co: null, src: ['CA Marks', colL(2 + 2 * k)] })),
+      ...Array.from({ length: nCt }, (_, k): Slot => ({ group: 'Class Tests (optional)', name: `CT${String(k + 1).padStart(2, '0')}`, max: ctMax, co: weights?.ctCo ?? null, src: ['CA Marks', colL(2 + k)] })),
     ],
   };
 }
 
 // ------------------------------------------------------------------ stage 1
-/** The marks sheet the faculty downloads. Sessional: the single `ca` sheet. Theory: the BME 211 workbook, blank. */
-export async function marksTemplate(info: CourseInfo, o: Outline, w: Warnings): Promise<Uint8Array> {
+/** The marks sheet the faculty downloads, built from the assessment tree (`plan`, read from the outline when not given).
+    `theory` layout: the department's theory workbook, blank. `columns` layout: the single `ca` sheet, one column per assessment. */
+export async function marksTemplate(info: CourseInfo, o: Outline, w: Warnings, plan: Plan = planFromOutline(info, o, w)): Promise<Uint8Array> {
   const ids = studentIds(info);
-  if (!isSessional(info)) return courseWorkbook(info, o, ids, theorySpec(info, o, w), null, true);
-  const items = planSessionalItems(info, o, w);
+  if (plan.layout === 'theory') return courseWorkbook(info, o, ids, theorySpec(info, o, w, theoryWeights(plan)), null, true);
+  const items = planColumns(plan);
+  if (!items.length) throw new Error('the assessment list is empty: add the assessments first');
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('ca');
   const tot = colL(items.length + 2);
@@ -141,7 +139,7 @@ export async function marksTemplate(info: CourseInfo, o: Outline, w: Warnings): 
   ws.getCell(`${g}2`).value = 'Enter marks in the yellow cells. Type Abs for an absent student.';
   ws.getCell(`${g}3`).value = 'Do not change rows 1-4 or the Student ID column.';
   ws.getColumn(items.length + 4).width = 60;
-  meta(wb, { course_no: info.courseNo, semester: info.semester, kind: 'sessional', layout: 'sessional-ca-v1' });
+  meta(wb, { course_no: info.courseNo, semester: info.semester, kind: 'columns', layout: 'columns-ca-v1' });
   return save(wb);
 }
 
@@ -186,56 +184,54 @@ export async function courseWorkbook(info: CourseInfo, o: Outline, ids: number[]
     // CA Marks
     ws = wb.addWorksheet('CA Marks');
     const nct = spec.nCt!;
-    const ctCols = Array.from({ length: nct }, (_, k) => colL(2 + 2 * k));
-    const bc = colL(2 + 2 * nct), bonus = colL(3 + 2 * nct), totc = colL(4 + 2 * nct), posc = colL(5 + 2 * nct);
+    const ctCols = Array.from({ length: nct }, (_, k) => colL(2 + k));
+    const bc = colL(2 + nct), bonus = colL(3 + nct), totc = colL(4 + nct);
     hdr(ws, 'A1', 'Student ID');
-    ctCols.forEach((c, k) => { hdr(ws, `${c}1`, `CT${String(k + 1).padStart(2, '0')} (${fmtNum(spec.ctMax!)})`); hdr(ws, `${next(c)}1`, 'Position'); });
-    hdr(ws, `${bc}1`, `Best ${spec.best} of ${nct}`); hdr(ws, `${bonus}1`, 'Bonus'); hdr(ws, `${totc}1`, 'Total'); hdr(ws, `${posc}1`, 'Position');
+    ctCols.forEach((c, k) => hdr(ws, `${c}1`, `CT${String(k + 1).padStart(2, '0')} (${fmtNum(spec.ctMax!)})`));
+    hdr(ws, `${bc}1`, `Best ${spec.best} of ${nct}`); hdr(ws, `${bonus}1`, 'Bonus'); hdr(ws, `${totc}1`, 'Total');
     ids.forEach((sid, i) => {
       const r = 2 + i;
       cell(ws, `A${r}`, sid);
       ctCols.forEach((c, k) => cell(ws, `${c}${r}`, markOut(d.ct?.get(key(sid, k)), filled), { inp: true }));
-      const rng = `${ctCols[0]}${r}:${colL(1 + 2 * nct)}${r}`;
+      const rng = `${ctCols[0]}${r}:${colL(1 + nct)}${r}`;
       const larg = Array.from({ length: spec.best! }, (_, j) => `IFERROR(LARGE(${rng},${j + 1}),0)`).join('+');
       cell(ws, `${bc}${r}`, f(`IF(COUNT(${rng})=0,IF(COUNTIF(${rng},"Abs*")>0,"Absent",""),ROUNDUP(${larg},0))`));
       cell(ws, `${bonus}${r}`, d.bonus?.get(sid) ?? null, { inp: true });
       cell(ws, `${totc}${r}`, f(`IF(ISNUMBER(${bc}${r}),${bc}${r}+N(${bonus}${r}),${bc}${r})`));
     });
     if (n) {
-      const [hi, lo, av] = statsRows(ws, [...ctCols, totc], 2, 1 + n);
-      for (let i = 0; i < n; i++) for (const c of [...ctCols, totc]) position(ws, c, 2 + i, 2, 1 + n, hi, lo, av);
+      statsRows(ws, [...ctCols, totc], 2, 1 + n);
       for (const c of ctCols) validateMarks(ws, c, 2, 1 + n, fmtNum(spec.ctMax!));
     }
-    ws.getColumn(1).width = 16; for (let j = 2; j <= 5 + 2 * nct; j++) ws.getColumn(j).width = 12; ws.getColumn(colN(bc)).width = 14;
+    ws.getColumn(1).width = 16; for (let j = 2; j <= 4 + nct; j++) ws.getColumn(j).width = 12; ws.getColumn(colN(bc)).width = 14;
     ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 1 }];
 
     // TF Marks
     ws = wb.addWorksheet('TF Marks');
     const sm = fmtNum(spec.tfSection!);
-    ([['A', 'Student ID'], ['B', `Section A (${sm})`], ['C', 'Position'], ['D', `Section B (${sm})`], ['E', 'Position'], ['F', 'Total'], ['G', 'Position']] as const).forEach(([c, v]) => hdr(ws, `${c}1`, v));
+    ([['A', 'Student ID'], ['B', `Section A (${sm})`], ['C', `Section B (${sm})`], ['D', 'Total']] as const).forEach(([c, v]) => hdr(ws, `${c}1`, v));
     ids.forEach((sid, i) => {
       const r = 2 + i;
       cell(ws, `A${r}`, sid);
       cell(ws, `B${r}`, markOut(d.tf?.get(key(sid, 0)), filled), { inp: true });
-      cell(ws, `D${r}`, markOut(d.tf?.get(key(sid, 1)), filled), { inp: true });
-      cell(ws, `F${r}`, f(`IF(COUNT(B${r},D${r})=0,IF(COUNTIF(B${r}:D${r},"Abs*")>0,"Absent",""),SUM(B${r},D${r}))`));
+      cell(ws, `C${r}`, markOut(d.tf?.get(key(sid, 1)), filled), { inp: true });
+      cell(ws, `D${r}`, f(`IF(COUNT(B${r},C${r})=0,IF(COUNTIF(B${r}:C${r},"Abs*")>0,"Absent",""),SUM(B${r},C${r}))`));
     });
     if (n) {
-      const [hi, lo, av] = statsRows(ws, ['B', 'D', 'F'], 2, 1 + n);
-      for (let i = 0; i < n; i++) for (const c of ['B', 'D', 'F']) position(ws, c, 2 + i, 2, 1 + n, hi, lo, av);
-      for (const c of ['B', 'D']) validateMarks(ws, c, 2, 1 + n, sm);
+      statsRows(ws, ['B', 'C', 'D'], 2, 1 + n);
+      for (const c of ['B', 'C']) validateMarks(ws, c, 2, 1 + n, sm);
     }
-    ws.getColumn(1).width = 16; for (let j = 2; j <= 7; j++) ws.getColumn(j).width = 16;
+    ws.getColumn(1).width = 16; for (let j = 2; j <= 4; j++) ws.getColumn(j).width = 16;
     ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 1 }];
   } else {
     // Sessional: CA Marks = the uploaded `ca` sheet, one column per assessment
     const ws = wb.addWorksheet('CA Marks');
     const items = spec.items!;
-    const cols = items.map((_, k) => colL(2 + 2 * k));
-    const tc = colL(2 + 2 * items.length);
+    const cols = items.map((_, k) => colL(2 + k));
+    const tc = colL(2 + items.length);
     hdr(ws, 'A1', 'Student ID');
-    items.forEach((it, k) => { hdr(ws, `${cols[k]}1`, `${it.name} (${fmtNum(it.max)})`); hdr(ws, `${next(cols[k])}1`, 'Position'); });
-    hdr(ws, `${tc}1`, `Total (${fmtNum(items.reduce((a, i) => a + i.max, 0))})`); hdr(ws, `${next(tc)}1`, 'Position');
+    items.forEach((it, k) => hdr(ws, `${cols[k]}1`, `${it.name} (${fmtNum(it.max)})`));
+    hdr(ws, `${tc}1`, `Total (${fmtNum(items.reduce((a, i) => a + i.max, 0))})`);
     ids.forEach((sid, i) => {
       const r = 2 + i;
       cell(ws, `A${r}`, sid);
@@ -244,10 +240,9 @@ export async function courseWorkbook(info: CourseInfo, o: Outline, ids: number[]
       cell(ws, `${tc}${r}`, f(`IF(COUNT(${refs})=0,"Absent",SUM(${refs}))`));
     });
     if (n) {
-      const [hi, lo, av] = statsRows(ws, [...cols, tc], 2, 1 + n);
-      for (let i = 0; i < n; i++) for (const c of [...cols, tc]) position(ws, c, 2 + i, 2, 1 + n, hi, lo, av);
+      statsRows(ws, [...cols, tc], 2, 1 + n);
     }
-    ws.getColumn(1).width = 16; for (let j = 2; j <= 3 + 2 * items.length; j++) ws.getColumn(j).width = 16;
+    ws.getColumn(1).width = 16; for (let j = 2; j <= 2 + items.length; j++) ws.getColumn(j).width = 16;
     ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 1 }];
   }
 
@@ -409,7 +404,7 @@ export async function courseWorkbook(info: CourseInfo, o: Outline, ids: number[]
   hdr(ws, 'O3', 'Cohort PO Attainment Threshold'); cell(ws, 'P3', COHORT_THRESHOLD, { fmt: '0%', inp: true });
   ws.getColumn(1).width = 22; for (let k = 2; k <= 13; k++) ws.getColumn(k).width = 12; ws.getColumn(15).width = 32; ws.getColumn(16).width = 14;
 
-  meta(wb, { course_no: info.courseNo, semester: info.semester, kind: spec.kind, layout: `${spec.kind}-bme211-v1`, n_students: n, n_ct: spec.nCt ?? '' });
+  meta(wb, { course_no: info.courseNo, semester: info.semester, kind: spec.kind, layout: `${spec.kind}-bme211-v2`, n_students: n, n_ct: spec.nCt ?? '', att_pct: spec.att ?? '', ca_pct: spec.ca ?? '', tf_pct: spec.tf ?? '' });
   return save(wb);
 }
 
@@ -459,7 +454,7 @@ function readMark(raw: string | number | null, sid: number, it: { name: string; 
 export function sessionalInputs(m: Marks, w: Warnings): { spec: Spec; data: Data; folders: FolderAssessment[] } {
   for (const it of m.items) if (it.cos.length > 1) w.add(`'${it.name}' lists several COs; the workbook maps it to CO${it.cos[0]} only (the CAR uses all of them)`);
   const spec: Spec = { kind: 'sessional', items: m.items,
-    slots: m.items.map((it, k) => ({ group: 'Assessments', name: it.name, max: it.max, co: it.cos[0] ?? null, src: ['CA Marks', colL(2 + 2 * k)] })) };
+    slots: m.items.map((it, k) => ({ group: 'Assessments', name: it.name, max: it.max, co: it.cos[0] ?? null, src: ['CA Marks', colL(2 + k)] })) };
   const item = new Map<string, number | null>();
   m.ids.forEach((s) => m.items.forEach((_, k) => item.set(key(s, k), m.values.get(key(s, k)) ?? null)));
   const folders = m.items.map((it, k) => ({ folder: it.name, name: it.name, max: it.max, values: new Map(m.ids.map((s) => [s, m.values.get(key(s, k)) ?? null])) }));
@@ -470,9 +465,12 @@ export function sessionalInputs(m: Marks, w: Warnings): { spec: Spec; data: Data
 export async function readTheoryWorkbook(data: ArrayBuffer | Uint8Array, info: CourseInfo, o: Outline, w: Warnings) {
   const wb = await loadWorkbook(data);
   for (const sh of ['Attendance Summary', 'CA Marks', 'TF Marks', MAP, COM]) if (!wb.getWorksheet(sh)) throw new Error(`marks workbook: sheet '${sh}' is missing (download a fresh template)`);
-  const spec = theorySpec(info, o, new Warnings());
   const metaWs = wb.getWorksheet('_meta');
-  if (metaWs) for (let r = 1; r <= metaWs.rowCount; r++) if (clean(v(metaWs, [r, 1])) === 'n_ct' && Number(v(metaWs, [r, 2]))) spec.nCt = Number(v(metaWs, [r, 2]));
+  const mv: Record<string, number> = {};
+  if (metaWs) for (let r = 1; r <= metaWs.rowCount; r++) { const n = Number(v(metaWs, [r, 2])); if (Number.isFinite(n) && clean(v(metaWs, [r, 2])) !== '') mv[clean(v(metaWs, [r, 1]))] = n; }
+  // The weights the template was made with (the faculty may have edited them on the page); older templates: from the outline.
+  const spec = theorySpec(info, o, new Warnings(), 'tf_pct' in mv ? { att: mv.att_pct ?? 0, ca: mv.ca_pct ?? 0, tf: mv.tf_pct } : undefined);
+  if (mv.n_ct) spec.nCt = mv.n_ct;
   const cm = wb.getWorksheet(COM)!, mp = wb.getWorksheet(MAP)!, ca = wb.getWorksheet('CA Marks')!, tf = wb.getWorksheet('TF Marks')!, at = wb.getWorksheet('Attendance Summary')!;
   const ids: number[] = [];
   const crow = new Map<number, number>();
@@ -480,7 +478,10 @@ export async function readTheoryWorkbook(data: ArrayBuffer | Uint8Array, info: C
   const coCols = new Map<number, number>();
   for (let c = 4; c <= mp.columnCount; c++) { const m = clean(v(mp, [1, c])).match(/^CO\s*(\d+)$/i); if (m) coCols.set(c, Number(m[1])); }
   const caCols = new Map<number, number>();
-  for (let c = 2; c <= ca.columnCount; c++) { const m = clean(v(ca, [1, c])).match(/^CT\s*(\d+)/i); if (m) caCols.set(Number(m[1]), c); }
+  let bonusCol = 0;
+  for (let c = 2; c <= ca.columnCount; c++) { const h = clean(v(ca, [1, c])); const m = h.match(/^CT\s*(\d+)/i); if (m) caCols.set(Number(m[1]), c); if (/^bonus/i.test(h)) bonusCol = c; }
+  const tfCol = (rx: RegExp, dflt: number) => { for (let c = 2; c <= tf.columnCount; c++) if (rx.test(clean(v(tf, [1, c])))) return c; return dflt; };
+  const tfA = tfCol(/^section\s*a/i, 2), tfB = tfCol(/^section\s*b/i, 3);
   const slots: (Slot & { col: number })[] = [];
   let group = '';
   for (let r = 2; r <= mp.rowCount; r++) {
@@ -519,13 +520,13 @@ export async function readTheoryWorkbook(data: ArrayBuffer | Uint8Array, info: C
   for (let r = 3; r <= at.rowCount; r++) { const s = toId(v(at, [r, 1])); if (s !== null) for (let k = 0; k < nf; k++) d.att!.set(key(s, k), toMark(v(at, [r, 2 + k]))); }
   for (const [s, rr] of caRow) {
     for (let k = 0; k < spec.nCt!; k++) if (caCols.has(k + 1)) d.ct!.set(key(s, k), toMark(v(ca, [rr, caCols.get(k + 1)!])));
-    d.bonus!.set(s, toMark(v(ca, [rr, 3 + 2 * spec.nCt!])));
+    if (bonusCol) d.bonus!.set(s, toMark(v(ca, [rr, bonusCol])));
   }
   const tfTotal = new Map<number, number | null>();
   for (let r = 2; r <= tf.rowCount; r++) {
     const s = toId(v(tf, [r, 1]));
     if (s === null) continue;
-    const a = toMark(v(tf, [r, 2])), b = toMark(v(tf, [r, 4]));
+    const a = toMark(v(tf, [r, tfA])), b = toMark(v(tf, [r, tfB]));
     d.tf!.set(key(s, 0), a); d.tf!.set(key(s, 1), b);
     tfTotal.set(s, a === null && b === null ? null : (a ?? 0) + (b ?? 0));
   }

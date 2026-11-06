@@ -1,0 +1,88 @@
+import { Plus, Trash2 } from 'lucide-react';
+import { Button, Input, Select } from '@/components/ui';
+import type { CO } from '@/lib/courseFolder/model';
+import { canUseTheory, itemMarks, kindOf, splitParts, type Plan, type PlanItem } from '@/lib/courseFolder/plan';
+
+const r2 = (x: number) => Math.round(x * 100) / 100;
+const fmt = (x: number) => String(r2(x));
+
+/** The assessments read from the outline, as a tree (course → assessment → CO columns), editable before the marks sheet is made. */
+export function AssessmentTree({ plan, onChange, cos, courseLabel, sessional, disabled }: {
+  plan: Plan; onChange: (p: Plan) => void; cos: CO[]; courseLabel: string; sessional: boolean; disabled?: boolean;
+}) {
+  const setItem = (k: number, it: PlanItem) => onChange({ ...plan, items: plan.items.map((x, j) => (j === k ? it : x)) });
+  const cosOf = (it: PlanItem) => it.parts.map((p) => p.co).filter((c): c is number => c !== null);
+  const toggleCo = (k: number, co: number) => {
+    const it = plan.items[k];
+    const now = cosOf(it).includes(co) ? cosOf(it).filter((c) => c !== co) : [...cosOf(it), co].sort((a, b) => a - b);
+    setItem(k, { ...it, parts: splitParts(now, itemMarks(it)) });
+  };
+  const setPct = (k: number, pct: number) => {
+    const it = plan.items[k];
+    setItem(k, { ...it, pct, parts: splitParts(it.parts.map((p) => p.co), (plan.total * pct) / 100) });
+  };
+  const setPartMarks = (k: number, j: number, marks: number) => {
+    const it = plan.items[k];
+    setItem(k, { ...it, parts: it.parts.map((p, i) => (i === j ? { ...p, marks } : p)) });
+  };
+  const add = () => onChange({ ...plan, items: [...plan.items, { name: '', pct: 0, kind: 'other', parts: [{ co: null, marks: 0 }] }] });
+  const remove = (k: number) => onChange({ ...plan, items: plan.items.filter((_, j) => j !== k) });
+  const pct = plan.items.reduce((a, i) => a + i.pct, 0), marks = plan.items.reduce((a, i) => a + itemMarks(i), 0);
+  const theoryOk = canUseTheory(plan.items);
+
+  return (
+    <div className="space-y-3">
+      {!sessional && <div className="flex flex-wrap items-center gap-2 text-sm">
+        <label htmlFor="tree-layout" className="text-muted">Marks sheet</label>
+        <Select id="tree-layout" className="h-8 w-auto" disabled={disabled} value={plan.layout} onChange={(e) => onChange({ ...plan, layout: e.target.value as Plan['layout'] })}>
+          <option value="theory" disabled={!theoryOk}>Department theory workbook (attendance, class tests, term final by question)</option>
+          <option value="columns">One column per assessment</option>
+        </Select>
+      </div>}
+      <div className="rounded border border-line">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line bg-sunken/50 text-sm">
+          <span className="font-semibold">{courseLabel}</span>
+          <span className={`tabular text-2xs ${Math.abs(pct - 100) > 0.01 || Math.abs(marks - plan.total) > 0.01 ? 'text-warn font-semibold' : 'text-muted'}`}>{fmt(pct)}% · {fmt(marks)} / {fmt(plan.total)} marks</span>
+        </div>
+        <ul className="divide-y divide-line">
+          {plan.items.map((it, k) => (
+            <li key={k} className="px-3 py-2.5 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span aria-hidden className="text-subtle">├</span>
+                <label className="sr-only" htmlFor={`tree-name-${k}`}>Assessment name</label>
+                <Input id={`tree-name-${k}`} className="h-8 flex-1 min-w-40" disabled={disabled} placeholder="Assessment, e.g. Quiz" value={it.name}
+                  onChange={(e) => setItem(k, { ...it, name: e.target.value, kind: kindOf(e.target.value) })} />
+                <label className="sr-only" htmlFor={`tree-pct-${k}`}>Weight (%)</label>
+                <div className="flex items-center gap-1"><Input id={`tree-pct-${k}`} type="number" min={0} max={100} step="any" className="h-8 w-20 text-right" disabled={disabled}
+                  value={it.pct} onChange={(e) => setPct(k, Number(e.target.value) || 0)} /><span className="text-2xs text-muted">%</span></div>
+                <span className="text-2xs text-muted tabular w-20 text-right">{fmt(itemMarks(it))} marks</span>
+                {!disabled && <button type="button" className="size-8 grid place-items-center rounded text-muted hover:text-bad hover:bg-sunken cursor-pointer" aria-label={`Remove ${it.name || 'assessment'}`} onClick={() => remove(k)}><Trash2 className="size-4" aria-hidden /></button>}
+              </div>
+              <div className="pl-5 flex flex-wrap items-center gap-1.5" role="group" aria-label={`COs assessed by ${it.name || 'this assessment'}`}>
+                <span className="text-2xs text-subtle mr-1">COs</span>
+                {cos.map((c) => { const on = cosOf(it).includes(c.no); return (
+                  <button key={c.no} type="button" disabled={disabled} aria-pressed={on} title={c.statement} onClick={() => toggleCo(k, c.no)}
+                    className={`h-6 px-2 rounded-full text-2xs font-mono font-semibold border transition-colors duration-150 cursor-pointer ${on ? 'bg-brand text-brand-fg border-brand' : 'bg-surface text-muted border-line hover:border-brand'}`}>CO{c.no}</button>); })}
+                {!cosOf(it).length && <span className="text-2xs text-warn">{it.kind === 'attendance' ? 'no CO (not counted for attainment)' : 'pick a CO'}</span>}
+              </div>
+              {it.parts.length > 1 && <ul className="pl-5 space-y-1">
+                {it.parts.map((p, j) => (
+                  <li key={j} className="flex items-center gap-2 text-2xs">
+                    <span aria-hidden className="text-subtle">{j === it.parts.length - 1 ? '└' : '├'}</span>
+                    <span className="font-mono w-24">{it.name || 'Assessment'} (CO{p.co})</span>
+                    <label className="sr-only" htmlFor={`tree-part-${k}-${j}`}>Marks for CO{p.co}</label>
+                    <Input id={`tree-part-${k}-${j}`} type="number" min={0} step="any" className="h-7 w-20 text-right" disabled={disabled} value={p.marks}
+                      onChange={(e) => setPartMarks(k, j, Number(e.target.value) || 0)} />
+                    <span className="text-muted">marks</span>
+                  </li>
+                ))}
+                <li className="text-2xs text-subtle pl-4">One marks column per CO; the split can be changed.</li>
+              </ul>}
+            </li>
+          ))}
+        </ul>
+        {!disabled && <div className="px-3 py-2 border-t border-line"><Button size="sm" variant="ghost" icon={<Plus className="size-4" aria-hidden />} onClick={add}>Add assessment</Button></div>}
+      </div>
+    </div>
+  );
+}

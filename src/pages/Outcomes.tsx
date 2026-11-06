@@ -41,7 +41,7 @@ export default function Outcomes() {
       {tab === 'program' && <ProgramPo />}
       {tab === 'coverage' && <Coverage data={data} obe={obe.data} />}
       {tab === 'cqi' && <BugsCqi />}
-      {tab === 'folder' && <CourseFolder />}
+      {tab === 'folder' && <CourseFolder termName={data?.term.name} />}
       {tab === 'framework' && <Framework />}
     </>
   );
