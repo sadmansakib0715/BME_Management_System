@@ -1,8 +1,8 @@
-import { Copy, FileDown, Plus, Trash2 } from 'lucide-react';
+import { Copy, FileDown, Plus, Trash2, Wand2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Callout, Card, CardHeader, Empty, Field, SegTabs, Select, Textarea, useToast } from '@/components/ui';
 import { must, useBugs, usePOs, useWrite } from '@/lib/api';
-import { coWarnings, CULMINATING_POS, DELIVERY, DOMAIN_LEVELS, KPA, TOOLS } from '@/lib/obe';
+import { coWarnings, CULMINATING_POS, DELIVERY, DOMAIN_LEVELS, impliedKpa, KPA, kpaAfterPoChange, sortKpa, TOOLS } from '@/lib/obe';
 import { supabase } from '@/lib/supabase';
 import type { CourseOutcome } from '@/lib/types';
 import CoPoBoard from './CoPoBoard';
@@ -26,7 +26,10 @@ export default function CoMapping({ offering, course, data, obe, canEdit, isAdmi
   useEffect(() => setCos(initial), [initial]);
   const dirty = JSON.stringify(cos) !== JSON.stringify(initial);
   const set = (i: number, patch: Partial<Draft>) => setCos((x) => x.map((c, j) => (j === i ? { ...c, ...patch } : c)));
-  const toggle = (i: number, key: 'pos' | 'kpa', v: string) => set(i, { [key]: cos[i][key].includes(v) ? cos[i][key].filter((x) => x !== v) : [...cos[i][key], v] });
+  const toggleKpa = (i: number, v: string) => set(i, { kpa: cos[i].kpa.includes(v) ? cos[i].kpa.filter((x) => x !== v) : sortKpa([...cos[i].kpa, v]) });
+  /** Changing a CO's POs also ticks (or unticks) the knowledge profile, complex problem and complex activity attributes those POs imply. */
+  const setPos = (i: number, next: string[]) => setCos((x) => x.map((c, j) => (j === i ? { ...c, pos: next, kpa: kpaAfterPoChange(c.kpa, c.pos, next, pos.data?.pos ?? []) } : c)));
+  const togglePo = (i: number, po: string) => setPos(i, cos[i].pos.includes(po) ? cos[i].pos.filter((x) => x !== po) : [...cos[i].pos, po]);
 
   const save = useWrite(async (list: Draft[]) => {
     const keep = list.filter((c) => c.id).map((c) => c.id!);
@@ -50,6 +53,10 @@ export default function CoMapping({ offering, course, data, obe, canEdit, isAdmi
 
   if (!pos.data) return null;
   const poList = pos.data.pos;
+  const impliedOf = (c: Draft) => sortKpa(c.pos.flatMap((code) => { const p = poList.find((x) => x.code === code); return p ? impliedKpa(p) : []; }));
+  const whyTicked = (c: Draft, k: string) => c.pos.filter((code) => { const p = poList.find((x) => x.code === code); return p && impliedKpa(p).includes(k); });
+  const unfilled = cos.filter((c) => impliedOf(c).some((k) => !c.kpa.includes(k))).length;
+  const fillKpa = () => setCos((x) => x.map((c) => ({ ...c, kpa: sortKpa([...c.kpa, ...impliedOf(c)]) })));
   const fromPrev = () => obe.prev && setCos(obe.prev.cos.map((c) => ({ tmp: crypto.randomUUID(), statement: c.statement, domain_levels: c.domain_levels ?? [], delivery: c.delivery ?? [], tools: c.tools ?? [],
     kpa: c.kpa ?? [], pos: obe.prev!.coPo.filter((m) => m.co_id === c.id).map((m) => m.po_code) })));
   const warnings = coWarnings(course, cos.map((c, i) => ({ id: c.id ?? c.tmp ?? String(i), statement: c.statement, kpa: c.kpa, domain_levels: c.domain_levels })),
@@ -102,7 +109,7 @@ export default function CoMapping({ offering, course, data, obe, canEdit, isAdmi
             {canEdit && dirty && saveButton}</>} />
         {view === 'connect'
           ? <CoPoBoard cos={cos.map((c, i) => ({ key: c.id ?? c.tmp ?? String(i), code: `CO${i + 1}`, statement: c.statement, pos: c.pos }))} pos={poList}
-              expected={CULMINATING_POS[course.code]} disabled={!canEdit} onChange={(i, next) => set(i, { pos: next })} />
+              expected={CULMINATING_POS[course.code]} disabled={!canEdit} onChange={setPos} />
           : <div className="overflow-x-auto"><table className="table">
           <thead><tr><th>CO</th>{poList.map((p) => <th key={p.code} className="text-center" title={`${p.title} (${p.k_profiles ?? '—'})`}>{p.code}</th>)}</tr></thead>
           <tbody>{cos.map((c, i) => (
@@ -110,14 +117,17 @@ export default function CoMapping({ offering, course, data, obe, canEdit, isAdmi
               {poList.map((p) => (
                 <td key={p.code} className="text-center p-1">
                   <input type="checkbox" className="size-4 accent-[rgb(var(--brand))] cursor-pointer disabled:cursor-default" disabled={!canEdit} checked={c.pos.includes(p.code)}
-                    onChange={() => toggle(i, 'pos', p.code)} aria-label={`CO${i + 1} maps to ${p.code}`} />
+                    onChange={() => togglePo(i, p.code)} aria-label={`CO${i + 1} maps to ${p.code}`} />
                 </td>))}
             </tr>))}</tbody>
         </table></div>}
       </Card>}
 
       {cos.length > 0 && <Card>
-        <CardHeader title="Knowledge profile, complex problem and complex activity" subtitle="The “Mapping of Knowledge Profile, CEP and CEA” table." />
+        <CardHeader title="Knowledge profile, complex problem and complex activity" subtitle="The “Mapping of Knowledge Profile, CEP and CEA” table. Ticked from the CO–PO mapping as you map: each PO's knowledge profiles (e.g. PO1 → K1–K4), P1 for a PO on complex engineering problems (PO1–PO7) and A1 for complex engineering activities (PO10). Add or remove ticks by hand as needed."
+          actions={canEdit && <>
+            {unfilled > 0 && <Button size="sm" icon={<Wand2 className="size-4" aria-hidden />} onClick={fillKpa} title="Adds the ticks the mapped POs imply; ticks already set stay">Tick from mapping ({unfilled} CO{unfilled === 1 ? '' : 's'})</Button>}
+            {dirty && saveButton}</>} />
         <div className="overflow-x-auto"><table className="table">
           <thead>
             <tr><th />{KPA.map((g) => <th key={g.group} colSpan={g.items.length} className="text-center border-l border-line">{g.group}</th>)}</tr>
@@ -128,7 +138,8 @@ export default function CoMapping({ offering, course, data, obe, canEdit, isAdmi
               {KPA.flatMap((g) => g.items.map(([k, label], j) => (
                 <td key={k} className={`text-center p-1 ${j === 0 ? 'border-l border-line' : ''}`}>
                   <input type="checkbox" className="size-4 accent-[rgb(var(--brand))] cursor-pointer disabled:cursor-default" disabled={!canEdit} checked={c.kpa.includes(k)}
-                    onChange={() => toggle(i, 'kpa', k)} aria-label={`CO${i + 1}: ${k} ${label}`} />
+                    onChange={() => toggleKpa(i, k)} aria-label={`CO${i + 1}: ${k} ${label}`}
+                    title={whyTicked(c, k).length ? `${k} ${label}: implied by ${whyTicked(c, k).join(', ')}` : `${k} ${label}`} />
                 </td>)))}
             </tr>))}</tbody>
         </table></div>

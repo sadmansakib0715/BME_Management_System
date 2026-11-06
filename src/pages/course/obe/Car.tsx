@@ -1,4 +1,4 @@
-import { FileDown, ListPlus, Printer, Wand2 } from 'lucide-react';
+import { FileDown, FileSpreadsheet, ListPlus, Printer, Wand2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button, Callout, Card, CardHeader, Field, StatusBadge, Textarea, useToast } from '@/components/ui';
 import { must, useWrite } from '@/lib/api';
@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useTerm } from '@/lib/TermContext';
 import type { CarStatus, CoPo, CourseOutcome, ObeAttainment } from '@/lib/types';
 import type { StatusOption } from '@/lib/workflow';
-import { save as saveFile } from './docData';
+import { carBlock, save as saveFile } from './docData';
 import type { ObeProps } from './shared';
 import { useCourseInfo } from './useDocInputs';
 
@@ -42,21 +42,20 @@ export default function Car({ offering, course, data, obe, canEdit, isAdmin }: O
   const write = useWrite((patch: Record<string, unknown>) => must(supabase.from('car_reports').upsert({ offering_id: offering.id, ...parts, status, ...patch, updated_at: new Date().toISOString() })));
   const toCqi = useWrite(() => must(supabase.from('cqi_items').insert({ loop: 'CO', source: 'CAR', offering_id: offering.id, course_code: course.code,
     finding: flags.length ? `Below or near threshold: ${flags.join(', ')}` : 'CAR recommendation', action: parts.part_e.trim(), effective_term: 'Next offering' })));
-  const block = (term: string, att: ObeAttainment[], cs: CourseOutcome[], cp: CoPo[]) => {
-    const m = mappedPos(cs, cp);
-    const cell = (type: 'CO' | 'PO', code: string, used: boolean, t: number) => {
-      const v = used ? valueOf(att, type, code) : null; const a = attained(v, t);
-      return { value: v, yn: (!used || a === null ? 'NA' : a ? 'Y' : 'N') as 'Y' | 'N' | 'NA' };
-    };
-    return { term, co: Object.fromEntries(coCodes().map((c, i) => [c, cell('CO', c, i < cs.length, coT)])), po: Object.fromEntries(PO_CODES.map((p) => [p, cell('PO', p, m.has(p), poT)])) };
-  };
+  const pdfCourse = { ...info, teachers: info.teachers.length ? info.teachers : teachers.map((name) => ({ name })) };
+  const current = () => carBlock(data.term.name, obe.attainment, obe.cos, obe.coPo, coT, poT);
   const downloadPdf = async () => {
     const { carPdf } = await import('@/lib/pdf/obeDocs');
-    const blocks = [...(obe.prev ? [block(obe.prev.termName, obe.prev.attainment, obe.prev.cos, obe.prev.coPo)] : []), block(data.term.name, obe.attainment, obe.cos, obe.coPo)];
-    saveFile(carPdf({ course: { ...info, teachers: info.teachers.length ? info.teachers : teachers.map((name) => ({ name })) }, section: null, textbooks: obe.docs?.textbooks ?? '',
-      lastTerm: obe.prev?.termName ?? null, blocks, partC: parts.part_c, partD: parts.part_d, partE: parts.part_e, status: CAR_STATES.find((x) => x.value === status)?.label ?? status,
-      thresholds: `A CO/PO is attained when at least ${coT * 100}% of the students reach ${Number(offering.co_threshold ?? 0.4) * 100}% on it (SAR §8.4). NA: not assessed or not mapped.${obe.run ? ` Calculated from ${obe.run.students} students' marks.` : ''}` }),
+    saveFile(carPdf({ course: pdfCourse, section: null, textbooks: obe.docs?.textbooks ?? '', lastTerm: obe.prev?.termName ?? null,
+      current: current(), previous: obe.prev ? carBlock(obe.prev.termName, obe.prev.attainment, obe.prev.cos, obe.prev.coPo, coT, poT) : null,
+      partC: parts.part_c, partD: parts.part_d, partE: parts.part_e }),
     `${course.code} CAR ${data.term.name}.pdf`);
+  };
+  /** "CO and PO Attainment for <course>.xlsx" in the department's layout. */
+  const downloadXlsx = async () => {
+    const [X, { attainmentSummaryWorkbook }] = await Promise.all([import('xlsx'), import('@/lib/attainmentXlsx')]);
+    X.writeFile(attainmentSummaryWorkbook(X, { code: course.code, title: course.title, sessions: [{ block: current(), teachers: pdfCourse.teachers.map((t) => t.name) }] }),
+      `CO and PO Attainment for ${course.code} ${data.term.name}.xlsx`.replace(/[^\w. -]+/g, '_'));
   };
   /** First wording for Parts C and E from the attainment results; the teachers edit it. */
   const draftFromResults = () => {
@@ -71,7 +70,7 @@ export default function Car({ offering, course, data, obe, canEdit, isAdmin }: O
       + (min ? ` The lowest is ${min.c} (${min.v.toFixed(2)}%).` : '')
       + (near.length ? ` ${near.map((x) => x.c).join(', ')} ${near.length === 1 ? 'is' : 'are'} within 10 points of the threshold.` : '')
       + (prevNote.length ? ` Compared with ${obe.prev!.termName}: ${prevNote.join('; ')}.` : ''),
-      '', 'Interpretation of student feedback: ', '', "Teachers' comment on teaching-learning: "].join('\n');
+      '', 'Interpretation of student feedback: ', '', "Teachers' comment on teaching learning: "].join('\n');
     const e = [`Major issues: ${low.length ? `${low.map((x) => x.c).join(', ')} below the threshold.` : near.length ? `${near.map((x) => x.c).join(', ')} close to the threshold.` : 'None.'}`,
       '', 'Plan for future actions for further improvement: '].join('\n');
     setParts({ ...parts, part_c: parts.part_c.trim() ? parts.part_c : c, part_e: parts.part_e.trim() ? parts.part_e : e });
@@ -85,6 +84,8 @@ export default function Car({ offering, course, data, obe, canEdit, isAdmin }: O
         <div className="ml-auto flex flex-wrap gap-2">
           {editable && (!parts.part_c.trim() || !parts.part_e.trim()) && obe.attainment.length > 0 && <Button size="sm" icon={<Wand2 className="size-4" aria-hidden />} onClick={draftFromResults}>Draft from results</Button>}
           <Button size="sm" icon={<FileDown className="size-4" aria-hidden />} onClick={() => downloadPdf().catch((e) => toast('bad', e.message))}>CAR PDF</Button>
+          <Button size="sm" icon={<FileSpreadsheet className="size-4" aria-hidden />} disabled={!obe.attainment.length} title={obe.attainment.length ? undefined : 'No attainment results yet'}
+            onClick={() => downloadXlsx().catch((e) => toast('bad', e.message))}>CO & PO attainment (xlsx)</Button>
           <Button size="sm" variant="ghost" icon={<Printer className="size-4" aria-hidden />} onClick={() => window.print()}>Print</Button>
           {editable && <Button size="sm" disabled={!dirty} loading={write.isPending} onClick={() => go({}, 'CAR saved')}>Save draft</Button>}
           {canEdit && status === 'draft' && <Button size="sm" variant="primary" disabled={needText || missing.length > 0} loading={write.isPending} onClick={() => go({ status: 'submitted' }, 'CAR submitted for review')}>Submit</Button>}
@@ -111,9 +112,10 @@ export default function Car({ offering, course, data, obe, canEdit, isAdmin }: O
             </dl>
           </section>
           <section>
-            <h3 className="text-sm font-semibold mb-2">B. Attainment for the previous and current terms</h3>
-            {obe.prev && <PartB title={`Previous · ${obe.prev.termName}`} att={obe.prev.attainment} cos={obe.prev.cos} coPo={obe.prev.coPo} coT={coT} poT={poT} />}
+            <h3 className="text-sm font-semibold mb-2">B. Attainment for current and previous terms</h3>
             <PartB title={`Current · ${data.term.name}`} att={obe.attainment} cos={obe.cos} coPo={obe.coPo} coT={coT} poT={poT} />
+            {obe.prev ? <PartB title={`Previous · ${obe.prev.termName}`} att={obe.prev.attainment} cos={obe.prev.cos} coPo={obe.prev.coPo} coT={coT} poT={poT} />
+              : <p className="text-sm text-muted">Previous term: not available.</p>}
           </section>
           <section className="space-y-4">
             <Field label="C. Comments: on attainment, on the BSFS student feedback, and on teaching and learning" htmlFor="car-c">

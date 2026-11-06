@@ -1,7 +1,9 @@
-// Shared layout for the department's OBE documents (Course Outline, CO-PO Mapping, Rubric, CAR), drawn with jsPDF.
-// The layouts follow the department's own documents as filed in the BME BUET OBE folder and submitted with the SAR (BAETE).
+// Shared layout for the department's OBE documents, drawn with jsPDF to match the department's own Word templates
+// (Templates/: BME 211_Course outline.pdf, CO-PO Mapping.docx, CAR.pdf, Basic information.docx, Instructors and schedule.docx,
+// BME OBE Info for question moderation.docx): US Letter, 2.5 cm margins, Helvetica, bold run-in labels, plain black grid tables.
 import { jsPDF } from 'jspdf';
 import { applyPlugin, type CellHookData, type RowInput, type UserOptions } from 'jspdf-autotable';
+import { BUET_LOGO } from './logo';
 
 // The plugin form works the same under Vite and Node (the default export differs between their module systems).
 applyPlugin(jsPDF);
@@ -12,7 +14,7 @@ export const UNIVERSITY = 'Bangladesh University of Engineering and Technology';
 export const DEPARTMENT = 'Department of Biomedical Engineering';
 
 // The built-in PDF fonts only cover Latin-1/WinAnsi; map the few symbols the app uses and drop anything else.
-const MAP: Record<string, string> = { '≥': '>=', '≤': '<=', '→': '->', '←': '<-', '✓': 'Yes', '✔': 'Yes', '×': 'x', '−': '-', ' ': ' ', '\t': '  ' };
+const MAP: Record<string, string> = { '≥': '>=', '≤': '<=', '→': '->', '←': '<-', '✓': 'Yes', '✔': 'Yes', '×': 'x', '−': '-', ' ': ' ', '\t': '  ', '●': '•' };
 const WINANSI_EXTRA = '€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ';
 export function clean(s: unknown): string {
   return String(s ?? '').replace(/./gsu, (ch) => {
@@ -24,130 +26,178 @@ export function clean(s: unknown): string {
 }
 
 type Orientation = 'portrait' | 'landscape';
+type Style = 'normal' | 'bold' | 'italic' | 'bolditalic';
+const PT = 0.3528; // mm per point
+export const BLACK: [number, number, number] = [0, 0, 0];
 
-/** A simple flowing A4 document: running y position, headings, paragraphs and tables that page-break on their own. */
+/** Plain grid table as in the Word templates: thin black lines, white header with bold text. */
+const GRID_STYLES: Partial<UserOptions['styles']> = { font: 'helvetica', fontSize: 10, cellPadding: { top: 1.2, bottom: 1.2, left: 1.6, right: 1.6 }, lineColor: BLACK, lineWidth: 0.2,
+  textColor: BLACK, valign: 'middle', overflow: 'linebreak' };
+const GRID_HEAD: Partial<UserOptions['headStyles']> = { fillColor: [255, 255, 255], textColor: BLACK, fontStyle: 'bold', halign: 'center', lineColor: BLACK, lineWidth: 0.2 };
+
+/** A flowing Letter-size document: running y position, run-in labels, justified paragraphs, lists and tables that page-break on their own. */
 export class Doc {
   doc: jsPDF;
   y: number;
-  readonly m = 15;
-  constructor(orientation: Orientation = 'portrait') {
-    this.doc = new jsPDF({ orientation, unit: 'mm', format: 'a4', compress: false });
+  readonly m: number;
+  /** Top of the text area: the margin, plus the running header's height when there is one. */
+  readonly top: number;
+  private header?: (d: Doc) => void;
+  constructor(opts: { orientation?: Orientation; margin?: number; header?: { height: number; draw: (d: Doc) => void } } = {}) {
+    this.doc = new jsPDF({ orientation: opts.orientation ?? 'portrait', unit: 'mm', format: 'letter', compress: false });
     this.doc.setFont('helvetica', 'normal');
-    this.y = this.m;
+    this.m = opts.margin ?? 25;
+    this.top = this.m + (opts.header?.height ?? 0);
+    this.header = opts.header?.draw;
+    this.y = this.top;
   }
   get width() { return this.doc.internal.pageSize.getWidth(); }
   get height() { return this.doc.internal.pageSize.getHeight(); }
   get inner() { return this.width - 2 * this.m; }
+  /** Lowest y for text: a little into the bottom margin, as Word does, with room left for the page number. */
+  get bottom() { return this.height - this.m + 5; }
+  lh(size: number, spacing = 1.25) { return size * PT * spacing; }
 
-  ensure(h: number) { if (this.y + h > this.height - this.m - 6) { this.doc.addPage(); this.y = this.m; } }
+  ensure(h: number) { if (this.y + h > this.bottom) { this.doc.addPage(); this.y = this.top; } }
+  gap(mm: number) { this.y += mm; }
+  font(size: number, style: Style = 'normal', family = 'helvetica') { this.doc.setFont(family, style); this.doc.setFontSize(size); }
 
-  /** University and department heading, then the document title (e.g. "Course Outline"). */
-  letterhead(title: string, sub?: string) {
-    const d = this.doc, cx = this.width / 2;
-    d.setFont('helvetica', 'bold'); d.setFontSize(13); d.text(clean(UNIVERSITY), cx, this.y + 4, { align: 'center' });
-    d.setFontSize(11.5); d.text(clean(DEPARTMENT.toUpperCase()), cx, this.y + 10, { align: 'center' });
-    d.setLineWidth(0.4); d.line(this.m, this.y + 13, this.width - this.m, this.y + 13);
-    d.setFontSize(13); d.text(clean(title), cx, this.y + 20, { align: 'center' });
-    this.y += 23;
-    if (sub) { d.setFont('helvetica', 'normal'); d.setFontSize(9.5); d.text(clean(sub), cx, this.y + 1, { align: 'center' }); this.y += 5; }
-    this.y += 2;
+  /** The outline's letterhead: BUET crest, university, department, then the document title. */
+  letterhead(title: string) {
+    const d = this.doc, cx = this.width / 2, s = 17;
+    d.addImage(BUET_LOGO, 'PNG', cx - s / 2, this.y, s, s);
+    this.y += s + 5;
+    this.font(11); d.text(clean(UNIVERSITY), cx, this.y, { align: 'center' });
+    this.y += 6.5;
+    this.font(14); d.text(clean(DEPARTMENT.toUpperCase()), cx, this.y, { align: 'center' });
+    this.y += 9.5;
+    this.font(14); d.text(clean(title), cx, this.y, { align: 'center' });
+    this.y += 10;
   }
 
-  heading(text: string) {
-    this.ensure(12);
-    this.doc.setFont('helvetica', 'bold'); this.doc.setFontSize(11);
-    this.doc.text(clean(text), this.m, this.y + 4);
-    this.y += 7;
+  /** Centred bold title lines (CAR, moderation form). */
+  title(lines: string[], size = 13) {
+    this.font(size, 'bold');
+    for (const l of lines) { this.doc.text(clean(l), this.width / 2, this.y + this.lh(size) * 0.8, { align: 'center' }); this.y += this.lh(size, 1.2); }
+    this.y += 4;
   }
 
-  para(text: string, opts: { size?: number; bold?: boolean; indent?: number } = {}) {
-    const d = this.doc, size = opts.size ?? 10, x = this.m + (opts.indent ?? 0);
-    d.setFont('helvetica', opts.bold ? 'bold' : 'normal'); d.setFontSize(size);
-    const lh = size * 0.42;
+  /** Bold heading such as "Course Contents:". */
+  heading(text: string, size = 11) {
+    this.ensure(this.lh(size) * 3);
+    this.font(size, 'bold');
+    this.doc.text(clean(text), this.m, this.y + this.lh(size) * 0.8);
+    this.y += this.lh(size) + 2.5;
+  }
+
+  /** Wrapped text, justified like the templates' contents (pass justify: false for ragged). Blank lines separate paragraphs. */
+  para(text: string, opts: { size?: number; style?: Style; indent?: number; width?: number; justify?: boolean; spacing?: number } = {}) {
+    const size = opts.size ?? 11, x = this.m + (opts.indent ?? 0), w = opts.width ?? this.inner - (opts.indent ?? 0);
+    const lh = this.lh(size, opts.spacing ?? 1.45);
     for (const block of clean(text).split('\n')) {
-      const lines = d.splitTextToSize(block || ' ', this.inner - (opts.indent ?? 0)) as string[];
-      for (const l of lines) { this.ensure(lh + 1); d.text(l, x, this.y + lh); this.y += lh; }
+      if (!block.trim()) { this.y += lh * 0.5; continue; }
+      this.font(size, opts.style ?? 'normal');
+      const lines = this.doc.splitTextToSize(block.trim(), w) as string[];
+      lines.forEach((l, i) => {
+        this.ensure(lh);
+        this.line(l, x, this.y + lh * 0.75, w, (opts.justify ?? true) && i < lines.length - 1);
+        this.y += lh;
+      });
     }
     this.y += 2;
   }
 
-  bullets(items: string[], size = 10) {
-    for (const it of items.filter((x) => x.trim())) {
-      const d = this.doc; d.setFont('helvetica', 'normal'); d.setFontSize(size);
-      const lh = size * 0.42;
-      const lines = d.splitTextToSize(clean(it.trim()), this.inner - 6) as string[];
-      lines.forEach((l, i) => { this.ensure(lh + 1); if (i === 0) d.text('•', this.m + 1.5, this.y + lh); d.text(l, this.m + 6, this.y + lh); this.y += lh; });
-      this.y += 0.8;
-    }
-    this.y += 1.5;
+  /** One line of text, spread to the full width when `justify` (the last line of a paragraph is not). */
+  private line(l: string, x: number, y: number, w: number, justify: boolean) {
+    const words = l.trim().split(/\s+/);
+    if (!justify || words.length < 2) { this.doc.text(l, x, y); return; }
+    const used = words.reduce((n, wd) => n + this.doc.getTextWidth(wd), 0);
+    const gap = (w - used) / (words.length - 1);
+    if (gap > this.doc.getTextWidth(' ') * 4) { this.doc.text(l, x, y); return; } // a very short line reads better ragged
+    let cx = x;
+    for (const wd of words) { this.doc.text(wd, cx, y); cx += this.doc.getTextWidth(wd) + gap; }
   }
 
-  /** Label: value lines in two columns, as at the top of the department's outlines. */
-  fields(rows: [string, string][], labelWidth = 38) {
-    const d = this.doc;
-    for (const [k, v] of rows) {
-      d.setFontSize(10);
-      const lines = d.splitTextToSize(clean(v || '-'), this.inner - labelWidth) as string[];
-      this.ensure(lines.length * 4.5 + 1);
-      d.setFont('helvetica', 'bold'); d.text(clean(k), this.m, this.y + 4);
-      d.setFont('helvetica', 'normal'); lines.forEach((l, i) => d.text(l, this.m + labelWidth, this.y + 4 + i * 4.3));
-      this.y += Math.max(1, lines.length) * 4.3 + 1.2;
+  /** Bulleted (•) or numbered (1.) list with hanging indent, as in the outline's objectives, outcomes and textbooks. */
+  list(items: string[], opts: { numbered?: boolean; size?: number; indent?: number; spacing?: number; justify?: boolean; itemGap?: number } = {}) {
+    const size = opts.size ?? 11, ind = opts.indent ?? 6, hang = 6.5, lh = this.lh(size, opts.spacing ?? 1.35);
+    items.map((x) => x.trim()).filter(Boolean).forEach((it, n) => {
+      this.font(size);
+      const w = this.inner - ind - hang;
+      const lines = this.doc.splitTextToSize(clean(it.replace(/^(\d+[.)]|[•●*-])\s*/, '')), w) as string[];
+      lines.forEach((l, i) => {
+        this.ensure(lh);
+        const y = this.y + lh * 0.75;
+        if (i === 0) this.doc.text(opts.numbered ? `${n + 1}.` : '•', this.m + ind, y);
+        this.line(l, this.m + ind + hang, y, w, (opts.justify ?? false) && i < lines.length - 1);
+        this.y += lh;
+      });
+      this.y += opts.itemGap ?? 0.6;
+    });
+    this.y += 2;
+  }
+
+  /** Bold label, value at a tab stop: the "Course No:   BME 211" block. A row can hold a second label/value pair on the right. */
+  fields(rows: ([string, string] | [string, string, string, string])[], opts: { tab?: number; size?: number; tab2?: number; tab3?: number } = {}) {
+    const size = opts.size ?? 11, tab = opts.tab ?? 52, tab2 = opts.tab2 ?? 104, tab3 = opts.tab3 ?? 143, lh = this.lh(size, 1.3);
+    for (const r of rows) {
+      this.font(size);
+      const lines = this.doc.splitTextToSize(clean(r[1] || ''), (r.length === 4 ? tab2 : this.inner) - tab - 2) as string[];
+      this.ensure(lh * Math.max(1, lines.length));
+      const y = this.y + lh * 0.75;
+      this.font(size, 'bold'); this.doc.text(clean(r[0]), this.m, y);
+      this.font(size); lines.forEach((l, i) => this.doc.text(l, this.m + tab, y + i * lh));
+      if (r.length === 4) { this.font(size, 'bold'); this.doc.text(clean(r[2]), this.m + tab2, y); this.font(size); this.doc.text(clean(r[3] || ''), this.m + tab3, y); }
+      this.y += lh * Math.max(1, lines.length);
     }
-    this.y += 1.5;
+    this.y += 4;
+  }
+
+  /** Label and value on one line at a tab stop, indented: the Assessment block ("Class participation/Attendance:   10%"). */
+  tabbed(rows: [string, string][], opts: { indent?: number; tab?: number; size?: number } = {}) {
+    const size = opts.size ?? 11, ind = opts.indent ?? 12, lh = this.lh(size, 1.3);
+    this.font(size);
+    const tab = opts.tab ?? Math.max(60, ...rows.map(([k]) => this.doc.getTextWidth(clean(k)) + 8));
+    for (const [k, v] of rows) {
+      this.ensure(lh);
+      const y = this.y + lh * 0.75;
+      this.doc.text(clean(k), this.m + ind, y); this.doc.text(clean(v), this.m + ind + tab, y);
+      this.y += lh;
+    }
+    this.y += 3;
   }
 
   table(head: RowInput[], body: RowInput[], opts: Partial<UserOptions> = {}) {
     const ticks = new Set<string>();
     (this.doc as WithTable).autoTable({
-      startY: this.y, head, body, theme: 'grid', margin: { left: this.m, right: this.m, bottom: this.m + 6 },
-      styles: { font: 'helvetica', fontSize: 8.6, cellPadding: 1.4, lineColor: [120, 120, 120], lineWidth: 0.15, textColor: [20, 20, 20], valign: 'middle', overflow: 'linebreak' },
-      headStyles: { fillColor: [232, 236, 241], textColor: [20, 20, 20], fontStyle: 'bold', halign: 'center' },
+      theme: 'grid', startY: this.y, head, body, margin: { left: this.m, right: this.m, top: this.top, bottom: this.height - this.bottom },
       ...opts,
+      styles: { ...GRID_STYLES, ...opts.styles },
+      headStyles: { ...GRID_HEAD, ...opts.headStyles },
       didParseCell: (h: CellHookData) => {
-        if (typeof h.cell.raw === 'string') {
-          if (h.cell.raw === TICK) { ticks.add(`${h.section}:${h.row.index}:${h.column.index}`); h.cell.text = ['']; }
-          else h.cell.text = h.cell.text.map(clean);
-        }
+        if (h.cell.raw === TICK) { ticks.add(`${h.section}:${h.row.index}:${h.column.index}`); h.cell.text = ['']; }
+        else h.cell.text = h.cell.text.map(clean);
         opts.didParseCell?.(h);
       },
       didDrawCell: (h: CellHookData) => {
         if (ticks.has(`${h.section}:${h.row.index}:${h.column.index}`)) {
           const cx = h.cell.x + h.cell.width / 2, cy = h.cell.y + h.cell.height / 2, d = this.doc;
-          d.setLineWidth(0.45); d.setDrawColor(20, 20, 20);
+          d.setLineWidth(0.45); d.setDrawColor(0, 0, 0);
           d.line(cx - 1.6, cy, cx - 0.4, cy + 1.3); d.line(cx - 0.4, cy + 1.3, cx + 1.8, cy - 1.5);
         }
         opts.didDrawCell?.(h);
       },
     });
-    this.y = (this.doc as WithTable).lastAutoTable.finalY + 4;
+    this.y = (this.doc as WithTable).lastAutoTable.finalY + 5;
   }
 
-  /** Signature blocks: a line, then the name and an optional caption. */
-  signatures(names: string[], caption = 'Signature') {
-    if (!names.length) return;
-    const per = this.inner / Math.min(3, names.length);
-    this.ensure(26);
-    this.y += 10;
-    names.forEach((n, i) => {
-      const col = i % 3, row = Math.floor(i / 3);
-      if (col === 0 && row > 0) { this.y += 22; this.ensure(22); }
-      const x = this.m + col * per;
-      this.doc.setLineWidth(0.25); this.doc.line(x, this.y, x + per - 8, this.y);
-      this.doc.setFont('helvetica', 'normal'); this.doc.setFontSize(9);
-      this.doc.text(clean(n), x, this.y + 4.5); this.doc.setFontSize(8); this.doc.setTextColor(90);
-      this.doc.text(clean(caption), x, this.y + 8.5); this.doc.setTextColor(0);
-    });
-    this.y += 14;
-  }
-
-  /** Footer on every page: document name, generation date and "Page n of N". */
-  finish(footer: string): jsPDF {
-    const d = this.doc, n = d.getNumberOfPages(), when = new Date().toISOString().slice(0, 10);
+  /** Running header on every page (CAR) and page numbers bottom right (outline, mapping). */
+  finish(opts: { pageNumbers?: boolean } = {}): jsPDF {
+    const d = this.doc, n = d.getNumberOfPages();
     for (let i = 1; i <= n; i++) {
-      d.setPage(i); d.setFont('helvetica', 'normal'); d.setFontSize(7.5); d.setTextColor(110);
-      d.text(clean(`${footer} · generated ${when}`), this.m, this.height - 8);
-      d.text(`Page ${i} of ${n}`, this.width - this.m, this.height - 8, { align: 'right' });
-      d.setTextColor(0);
+      d.setPage(i);
+      if (this.header) { const y = this.y; this.y = this.m; this.header(this); this.y = y; }
+      if (opts.pageNumbers ?? true) { this.font(10, 'normal', 'times'); d.text(String(i), this.width - this.m, this.height - 12, { align: 'right' }); }
     }
     return d;
   }
@@ -157,3 +207,5 @@ export class Doc {
 export const byNum = (a: string, b: string) => Number(a.replace(/\D/g, '')) - Number(b.replace(/\D/g, ''));
 export const pct = (v: number | null | undefined) => (v === null || v === undefined ? 'NA' : (Math.round(v * 100) / 100).toFixed(2));
 export const fileName = (s: string) => s.replace(/[^\w.-]+/g, '_');
+/** Lines of a multi-line field, without empty ones. */
+export const linesOf = (s: string | null | undefined) => (s ?? '').split('\n').map((x) => x.trim()).filter(Boolean);

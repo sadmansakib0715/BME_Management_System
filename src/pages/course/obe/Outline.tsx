@@ -1,15 +1,16 @@
 import { Copy, FileDown, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Callout, Card, CardHeader, Empty, Field, Input, Textarea, useToast } from '@/components/ui';
-import { must, rpc, usePOs, useWrite } from '@/lib/api';
+import { must, rpc, useWrite } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
-import { coRows, poRefs, save as saveFile } from './docData';
+import { coRows, save as saveFile } from './docData';
 import type { ObeProps } from './shared';
 import { useCourseInfo } from './useDocInputs';
 
 const FILE_LABEL: Record<string, string> = { co_po_mapping: 'CO-PO mapping', outline: 'Course outline', assessment_workbook: 'CO-PO-assessment workbook' };
 type Mark = { component: string; percent: string };
 type Lec = { lectures: string; topic: string; cos: string };
+type Contact = { name: string; room: string; email: string; phone: string };
 
 /** Default "Assessment Strategy" wording of the department's outlines, by course type. */
 function defaultStrategy(type: string): string {
@@ -26,14 +27,16 @@ function defaultMarks(type: string): Mark[] {
     COs and their mapping come from “COs & mapping”. Download it as a PDF in the department's outline layout. */
 export default function Outline({ offering, course, data, obe, canEdit, isAdmin }: ObeProps) {
   const toast = useToast();
-  const pos = usePOs();
   const info = useCourseInfo({ offering, course, data, obe });
+  const teachersKey = JSON.stringify(info.teachers);
   const d = obe.docs;
   const from = useMemo(() => ({
     contents: d?.contents ?? '', objectives: d?.objectives ?? '', strategy: d?.assessment_strategy ?? '', textbooks: d?.textbooks ?? '',
     marks: (d?.marks_distribution ?? []).map((m) => ({ component: m.component, percent: String(m.percent) })) as Mark[],
     plan: (d?.lecture_plan ?? []) as Lec[],
-  }), [d]);
+    session: d?.academic_session ?? '', routine: d?.class_routine ?? '',
+    contacts: (JSON.parse(teachersKey) as typeof info.teachers).map((t) => ({ name: t.name, room: t.room ?? '', email: t.email ?? '', phone: t.phone ?? '' })) as Contact[],
+  }), [d, teachersKey]);
   const [v, setV] = useState(from);
   useEffect(() => setV(from), [from]);
   const dirty = JSON.stringify(v) !== JSON.stringify(from);
@@ -45,17 +48,29 @@ export default function Outline({ offering, course, data, obe, canEdit, isAdmin 
     assessment_strategy: v.strategy.trim() || null, textbooks: v.textbooks.trim() || null,
     marks_distribution: v.marks.map((m) => ({ component: m.component.trim(), percent: Number(m.percent) })),
     lecture_plan: v.plan.filter((r) => r.topic.trim() || r.lectures.trim()).map((r) => ({ lectures: r.lectures.trim(), topic: r.topic.trim(), cos: r.cos.trim() })),
-    updated_at: new Date().toISOString() })));
+    instructors: v.contacts.map((c) => ({ name: c.name, room: c.room.trim() || undefined, email: c.email.trim() || undefined, phone: c.phone.trim() || undefined })),
+    academic_session: v.session.trim() || null, class_routine: v.routine.trim() || null,
+    updated_at: new Date().toISOString() })).catch((e: Error) => {
+      if (/academic_session|class_routine/.test(e.message)) throw new Error('The database needs the new outline fields: run supabase/update_obe_schema.sql in the Supabase SQL Editor once, then save again.');
+      throw e;
+    }));
   const fill = useWrite(() => rpc.copyForward(offering.id));
   const files = Object.entries(d?.source?.files ?? {});
 
-  const download = async () => {
-    const { outlinePdf } = await import('@/lib/pdf/obeDocs');
-    saveFile(outlinePdf({ course: info, contents: v.contents, objectives: v.objectives, cos: coRows(obe), pos: poRefs(pos.data?.pos ?? []),
-      assessmentStrategy: v.strategy, marks: v.marks.filter((m) => m.component.trim()).map((m) => ({ component: m.component, percent: Number(m.percent) || 0 })),
-      textbooks: v.textbooks, lecturePlan: v.plan.filter((r) => r.topic.trim() || r.lectures.trim()), preparedBy: info.teachers.map((t) => t.name) }),
+  // The PDFs use what is on screen, including unsaved edits.
+  const shown = { ...info, session: v.session, routine: v.routine, teachers: v.contacts.map((c) => ({ name: c.name, room: c.room, email: c.email, phone: c.phone })) };
+  const marks = v.marks.filter((m) => m.component.trim()).map((m) => ({ component: m.component, percent: Number(m.percent) || 0 }));
+  const unit = course.course_type === 'theory' ? 'Week' : 'Lecture';
+  const download = async (kind: 'outline' | 'basic' | 'teachers') => {
+    const pdf = await import('@/lib/pdf/obeDocs');
+    if (kind === 'basic') return saveFile(pdf.basicInfoPdf({ course: shown, marks }), `${course.code} Basic information ${data.term.name}.pdf`);
+    if (kind === 'teachers') return saveFile(pdf.instructorsPdf({ course: shown }), `${course.code} Instructors and schedule ${data.term.name}.pdf`);
+    saveFile(pdf.outlinePdf({ course: shown, contents: v.contents, objectives: v.objectives, cos: coRows(obe), marks,
+      textbooks: v.textbooks, lecturePlan: v.plan.filter((r) => r.topic.trim() || r.lectures.trim()), scheduleUnit: unit,
+      preparedBy: shown.teachers.map((t) => t.name) }),
     `${course.code} Course Outline ${data.term.name}.pdf`);
   };
+  const setContact = (i: number, p: Partial<Contact>) => setV((x) => ({ ...x, contacts: x.contacts.map((c, j) => (j === i ? { ...c, ...p } : c)) }));
   const setMark = (i: number, p: Partial<Mark>) => setV((x) => ({ ...x, marks: x.marks.map((m, j) => (j === i ? { ...m, ...p } : m)) }));
   const setLec = (i: number, p: Partial<Lec>) => setV((x) => ({ ...x, plan: x.plan.map((m, j) => (j === i ? { ...m, ...p } : m)) }));
   const missing = [!v.contents.trim() && 'course contents', !obe.cos.length && 'COs (under COs & mapping)', !v.marks.length && 'distribution of marks'].filter(Boolean) as string[];
@@ -67,12 +82,14 @@ export default function Outline({ offering, course, data, obe, canEdit, isAdmin 
           actions={<>
             {canEdit && !d && obe.prev && <Button size="sm" icon={<Copy className="size-4" aria-hidden />} loading={fill.isPending}
               onClick={() => fill.mutate(undefined, { onSuccess: () => toast('ok', `Filled from ${obe.prev!.termName}`), onError: (e) => toast('bad', e.message) })}>Fill from {obe.prev.termName}</Button>}
-            <Button size="sm" icon={<FileDown className="size-4" aria-hidden />} disabled={!pos.data} onClick={() => download().catch((e) => toast('bad', e.message))}>Outline PDF</Button>
+            <Button size="sm" icon={<FileDown className="size-4" aria-hidden />} onClick={() => download('outline').catch((e) => toast('bad', e.message))}>Outline PDF</Button>
+            <Button size="sm" variant="ghost" icon={<FileDown className="size-4" aria-hidden />} onClick={() => download('basic').catch((e) => toast('bad', e.message))}>Basic information</Button>
+            <Button size="sm" variant="ghost" icon={<FileDown className="size-4" aria-hidden />} onClick={() => download('teachers').catch((e) => toast('bad', e.message))}>Instructors & schedule</Button>
             {canEdit && <Button size="sm" variant="primary" disabled={!dirty || badMarks} loading={save.isPending} onClick={() => save.mutate(undefined, { onSuccess: () => toast('ok', 'Outline saved'), onError: (e) => toast('bad', e.message) })}>Save</Button>}</>} />
         <div className="p-4 grid gap-4 lg:grid-cols-2">
           <Field label="Course contents" htmlFor="o-contents" hint="As approved by the Academic Council."><Textarea id="o-contents" className="min-h-40" disabled={!canEdit} value={v.contents} onChange={(e) => setV({ ...v, contents: e.target.value })} /></Field>
           <Field label="Course objectives" htmlFor="o-objectives" hint="One per line."><Textarea id="o-objectives" className="min-h-40" disabled={!canEdit} value={v.objectives} onChange={(e) => setV({ ...v, objectives: e.target.value })} /></Field>
-          <Field label="Assessment strategy" htmlFor="o-strategy" hint={canEdit && !v.strategy.trim() ? <button type="button" className="link" onClick={() => setV({ ...v, strategy: defaultStrategy(course.course_type) })}>Use the department wording</button> : undefined}>
+          <Field label="Assessment strategy" htmlFor="o-strategy" hint={<>For the course file; the department's outline template does not print it.{canEdit && !v.strategy.trim() && <> <button type="button" className="link" onClick={() => setV({ ...v, strategy: defaultStrategy(course.course_type) })}>Use the department wording</button></>}</>}>
             <Textarea id="o-strategy" className="min-h-32" disabled={!canEdit} value={v.strategy} onChange={(e) => setV({ ...v, strategy: e.target.value })} /></Field>
           <Field label="Textbooks and references" htmlFor="o-books" hint="One per line."><Textarea id="o-books" className="min-h-32" disabled={!canEdit} value={v.textbooks} onChange={(e) => setV({ ...v, textbooks: e.target.value })} /></Field>
         </div>
@@ -94,12 +111,12 @@ export default function Outline({ offering, course, data, obe, canEdit, isAdmin 
           {v.marks.length > 0 && Math.abs(markTotal - 100) > 0.01 && <p className="px-4 pb-3 text-2xs text-warn">The shares add up to {Math.round(markTotal * 100) / 100}%, not 100%.</p>}
         </Card>
         <Card>
-          <CardHeader title="Lecture plan" subtitle="Lecture numbers, topics and the COs they serve."
+          <CardHeader title="Weekly schedule" subtitle={`${unit} numbers and topics. Leave the number empty for a row such as “Mid-term break”; COs, if given, print under the topic.`}
             actions={canEdit && <Button size="sm" icon={<Plus className="size-4" aria-hidden />} onClick={() => setV({ ...v, plan: [...v.plan, { lectures: '', topic: '', cos: '' }] })}>Add row</Button>} />
           {!v.plan.length ? <p className="px-4 py-4 text-sm text-muted">No lecture plan yet.</p> : <div className="overflow-x-auto"><table className="table">
-            <thead><tr><th className="w-24">Lecture(s)</th><th>Topics</th><th className="w-28">CO(s)</th>{canEdit && <th className="w-10" />}</tr></thead>
+            <thead><tr><th className="w-24">{unit}</th><th>Topics</th><th className="w-28">CO(s)</th>{canEdit && <th className="w-10" />}</tr></thead>
             <tbody>{v.plan.map((r, i) => <tr key={i}>
-              <td><label className="sr-only" htmlFor={`lp-l-${i}`}>Lectures</label><Input id={`lp-l-${i}`} className="h-8" placeholder="1–3" disabled={!canEdit} value={r.lectures} onChange={(e) => setLec(i, { lectures: e.target.value })} /></td>
+              <td><label className="sr-only" htmlFor={`lp-l-${i}`}>Lectures</label><Input id={`lp-l-${i}`} className="h-8" placeholder="1" disabled={!canEdit} value={r.lectures} onChange={(e) => setLec(i, { lectures: e.target.value })} /></td>
               <td><label className="sr-only" htmlFor={`lp-t-${i}`}>Topics</label><Textarea id={`lp-t-${i}`} className="min-h-9" disabled={!canEdit} value={r.topic} onChange={(e) => setLec(i, { topic: e.target.value })} /></td>
               <td><label className="sr-only" htmlFor={`lp-c-${i}`}>COs</label><Input id={`lp-c-${i}`} className="h-8" placeholder="CO1, CO2" disabled={!canEdit} value={r.cos} onChange={(e) => setLec(i, { cos: e.target.value })} /></td>
               {canEdit && <td className="p-1"><Button variant="ghost" size="sm" aria-label={`Remove lecture row ${i + 1}`} onClick={() => setV({ ...v, plan: v.plan.filter((_, j) => j !== i) })}><Trash2 className="size-4" aria-hidden /></Button></td>}
@@ -112,10 +129,19 @@ export default function Outline({ offering, course, data, obe, canEdit, isAdmin 
 
       <div className="grid gap-5 xl:grid-cols-2">
         <Card>
-          <CardHeader title="Course teachers on the outline" subtitle="Teachers assigned this term, with room and email from the last outline. Teaching assignments are set under Term setup." />
-          {!info.teachers.length ? <p className="px-4 py-4 text-sm text-muted">None recorded.</p> : (
-            <table className="table"><thead><tr><th>Name</th><th>Room</th><th>Email</th></tr></thead>
-              <tbody>{info.teachers.map((i, k) => <tr key={k}><td className="text-sm">{i.name}</td><td className="text-sm text-muted">{i.room ?? '—'}</td><td className="text-sm text-muted">{i.email ?? '—'}</td></tr>)}</tbody></table>)}
+          <CardHeader title="Course teachers, session and routine" subtitle="Printed in the outline header and the “Course Teacher(s)” table. Teachers are those assigned this term (Term setup); add their room, email and phone here." />
+          <div className="p-4 grid gap-3 sm:grid-cols-2">
+            <Field label="Academic session" htmlFor="o-session" hint="e.g. 2023-2024"><Input id="o-session" disabled={!canEdit} value={v.session} onChange={(e) => setV({ ...v, session: e.target.value })} /></Field>
+            <Field label="Class routine" htmlFor="o-routine" hint="One slot per line, e.g. Sunday: 09:00 AM-09:50 AM"><Textarea id="o-routine" className="min-h-20" disabled={!canEdit} value={v.routine} onChange={(e) => setV({ ...v, routine: e.target.value })} /></Field>
+          </div>
+          {!v.contacts.length ? <p className="px-4 pb-4 text-sm text-muted">No teachers assigned yet.</p> : <div className="overflow-x-auto"><table className="table">
+            <thead><tr><th>Name</th><th className="w-32">Office/Room</th><th>Email</th><th className="w-40">Telephone</th></tr></thead>
+            <tbody>{v.contacts.map((c, i) => <tr key={c.name + i}>
+              <td className="text-sm">{c.name}</td>
+              <td><label className="sr-only" htmlFor={`tc-r-${i}`}>Room of {c.name}</label><Input id={`tc-r-${i}`} className="h-8" placeholder="ECE-1121" disabled={!canEdit} value={c.room} onChange={(e) => setContact(i, { room: e.target.value })} /></td>
+              <td><label className="sr-only" htmlFor={`tc-e-${i}`}>Email of {c.name}</label><Input id={`tc-e-${i}`} className="h-8" type="email" disabled={!canEdit} value={c.email} onChange={(e) => setContact(i, { email: e.target.value })} /></td>
+              <td><label className="sr-only" htmlFor={`tc-p-${i}`}>Telephone of {c.name}</label><Input id={`tc-p-${i}`} className="h-8" placeholder="+880 1…" disabled={!canEdit} value={c.phone} onChange={(e) => setContact(i, { phone: e.target.value })} /></td>
+            </tr>)}</tbody></table></div>}
         </Card>
         <Card>
           <CardHeader title="In the department OBE folder" subtitle="BME BUET OBE Documents (SharePoint)." />
