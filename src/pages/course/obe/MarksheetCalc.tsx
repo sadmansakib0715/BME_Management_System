@@ -1,18 +1,21 @@
 import { Download, FileSpreadsheet, Upload } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Callout, Card, CardHeader, Dialog, useToast } from '@/components/ui';
+import { Button, Callout, Card, CardHeader, Dialog, Field, Input, useToast } from '@/components/ui';
 import { rpc, useWrite } from '@/lib/api';
-import { buildResultsWorkbook, buildTemplate, computeAttainment, coPoCodes, mapFingerprint, marksheetColumns, parseMarksheet,
+import { buildResultsWorkbook, buildTemplate, computeAttainment, coPoCodes, DEPT_CODE, mapFingerprint, marksheetColumns, parseMarksheet, parseMissing, studentIds,
   type AttainmentResult, type Issue, type StudentResult, type Thresholds } from '@/lib/attainment';
 import { criteriaWarnings, fmtPct } from '@/lib/obe';
-import { supabase } from '@/lib/supabase';
 import { YesNo, type ObeProps } from './shared';
 
 type Preview = { fileName: string; issues: Issue[]; result: AttainmentResult | null };
 const fileSafe = (s: string) => s.replace(/[^\w.-]+/g, '_');
 const errorsOf = (xs: Issue[]) => xs.filter((i) => i.level === 'error');
 const warningsOf = (xs: Issue[]) => xs.filter((i) => i.level === 'warning');
+// The batch, student count and missing rolls are remembered per offering in this browser, as a convenience.
+type Roll = { batch: string; count: string; missing: string };
+const rollKey = (id: string) => `marksheet-rolls:${id}`;
+const loadRoll = (id: string): Roll => { try { return { batch: '', count: '50', missing: '', ...JSON.parse(localStorage.getItem(rollKey(id)) ?? '{}') }; } catch { return { batch: '', count: '50', missing: '' }; } };
 
 /** Calculate CO and PO attainment from a filled marksheet. The template comes from the assessment map, so once the COs, mapping and
     assessment map are set, uploading the marks is all that is left. Marks are read here in the browser and never stored. */
@@ -21,6 +24,13 @@ export default function MarksheetCalc({ offering, course, data, obe, canEdit }: 
   const input = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
+  const [roll, setRollState] = useState<Roll>(() => loadRoll(offering.id));
+  const setRoll = (p: Partial<Roll>) => setRollState((r) => { const n = { ...r, ...p }; try { localStorage.setItem(rollKey(offering.id), JSON.stringify(n)); } catch { /* private window */ } return n; });
+  const batchOk = /^\d{2}$/.test(roll.batch.trim());
+  const countN = Number(roll.count);
+  const countOk = Number.isInteger(countN) && countN >= 1 && countN <= 999;
+  const missing = useMemo(() => parseMissing(roll.missing, roll.batch.trim()), [roll.missing, roll.batch]);
+  const ids = useMemo(() => (batchOk && countOk ? studentIds(roll.batch.trim(), countN, missing.rolls) : []), [batchOk, countOk, roll.batch, countN, missing]);
   const t: Thresholds = { studentCo: Number(offering.co_threshold ?? 0.4), cohortCo: Number(offering.cohort_threshold ?? 0.4),
     studentPo: Number(offering.po_threshold ?? 0.4), cohortPo: Number(offering.po_threshold ?? 0.4) };
   const columns = useMemo(() => marksheetColumns(obe.cos, obe.criteria, obe.criterionCos), [obe.cos, obe.criteria, obe.criterionCos]);
@@ -35,12 +45,7 @@ export default function MarksheetCalc({ offering, course, data, obe, canEdit }: 
     setBusy(true);
     try {
       const X = await import('xlsx');
-      // The roster pre-fills the student rows when it has been loaded; otherwise the teacher types the IDs.
-      const { data: en } = await supabase.from('enrolments').select('students(student_no, name)').eq('offering_id', offering.id);
-      const roster = ((en ?? []) as unknown as { students: { student_no: string; name: string } | null }[])
-        .flatMap((e) => (e.students ? [{ studentNo: e.students.student_no, name: e.students.name }] : []))
-        .sort((a, b) => a.studentNo.localeCompare(b.studentNo));
-      X.writeFile(buildTemplate(X, { title, columns, roster }), fileSafe(`${course.code} ${data.term.name} marksheet.xlsx`));
+      X.writeFile(buildTemplate(X, { title, columns, studentIds: ids }), fileSafe(`${course.code} ${data.term.name} marksheet.xlsx`));
     } catch (e) { toast('bad', (e as Error).message); } finally { setBusy(false); }
   };
 
@@ -107,7 +112,6 @@ export default function MarksheetCalc({ offering, course, data, obe, canEdit }: 
         <CardHeader title="Calculate from the marksheet"
           subtitle={<>Download the template (one column per question part or criterion in the <Link className="link" to="?s=assessment">assessment map</Link>, already tagged to COs), fill in the marks and upload it. CO and PO attainment are calculated at once. Marks stay on your computer; only the results are saved.</>}
           actions={<>
-            <Button size="sm" icon={<Download className="size-4" aria-hidden />} disabled={!ready} loading={busy && !preview} onClick={downloadTemplate}>Marksheet template</Button>
             {canEdit && <><input ref={input} type="file" accept=".xlsx,.xls,.csv" className="sr-only" id="marksheet-file" onChange={(e) => onFile(e.target.files?.[0])} />
               <Button size="sm" variant="primary" icon={<Upload className="size-4" aria-hidden />} disabled={!ready || busy} onClick={() => input.current?.click()}>Upload marksheet</Button></>}
           </>} />
@@ -115,8 +119,21 @@ export default function MarksheetCalc({ offering, course, data, obe, canEdit }: 
           {!obe.cos.length && <Callout tone="warn">Add the COs and their PO mapping first (COs & mapping).</Callout>}
           {obe.cos.length > 0 && !columns.length && <Callout tone="warn" title="The assessment map is empty">
             Add the question parts and rubric criteria with their marks and COs under <Link className="link" to="?s=assessment">Assessment map</Link>. The marksheet template is built from it.</Callout>}
-          {ready && <p className="text-muted">Template: {columns.length} {columns.length === 1 ? 'column' : 'columns'} from the assessment map, CO1–CO{obe.cos.length},
-            student threshold {t.studentCo * 100}%, cohort threshold {t.cohortCo * 100}%.</p>}
+          {ready && <div className="rounded border border-line p-3 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-[7rem_8rem_1fr_auto] sm:items-end">
+              <Field label="Batch" htmlFor="ms-batch"><Input id="ms-batch" inputMode="numeric" maxLength={2} placeholder="e.g. 20" value={roll.batch} onChange={(e) => setRoll({ batch: e.target.value.replace(/\D/g, '') })} /></Field>
+              <Field label="Number of students" htmlFor="ms-count"><Input id="ms-count" type="number" min={1} max={999} value={roll.count} onChange={(e) => setRoll({ count: e.target.value })} /></Field>
+              <Field label="Missing rolls" htmlFor="ms-missing"><Input id="ms-missing" placeholder="e.g. 7, 23, 41-42 or 2018007" value={roll.missing} onChange={(e) => setRoll({ missing: e.target.value })} /></Field>
+              <Button icon={<Download className="size-4" aria-hidden />} disabled={!batchOk || !countOk || busy} loading={busy && !preview} onClick={downloadTemplate}>Marksheet template</Button>
+            </div>
+            <p className="text-muted">
+              {batchOk && countOk && ids.length > 0
+                ? <>Student IDs <span className="font-mono">{ids[0]}</span> to <span className="font-mono">{ids[ids.length - 1]}</span>, {ids.length} students{missing.rolls.size > 0 && <> ({[...missing.rolls].filter((r) => r <= countN).length} missing left out)</>}. </>
+                : <>Enter the batch to fill in the student IDs (batch + {DEPT_CODE} + roll, e.g. 20{DEPT_CODE}001). </>}
+              {columns.length} {columns.length === 1 ? 'column' : 'columns'} from the assessment map, CO1–CO{obe.cos.length}, student threshold {t.studentCo * 100}%, cohort threshold {t.cohortCo * 100}%.
+            </p>
+            {missing.bad.length > 0 && <p className="text-2xs text-warn">Not understood, ignored: {missing.bad.join(', ')}</p>}
+          </div>}
           {ready && mapWarnings.length > 0 && <Callout tone="warn" title="Fix the assessment map first">
             <ul className="list-disc pl-5">{mapWarnings.slice(0, 6).map((w) => <li key={w}>{w}</li>)}</ul></Callout>}
           {run && <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded border border-line bg-sunken/50 px-3 py-2">

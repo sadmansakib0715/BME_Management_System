@@ -45,28 +45,55 @@ export function mapFingerprint(columns: MarkColumn[], coToPo: Record<string, str
   return (h >>> 0).toString(36);
 }
 
+// ---------------------------------------------------------------- student IDs
+/** BME's department code in BUET student IDs. */
+export const DEPT_CODE = '18';
+
+/** Missing rolls typed as "7, 23, 41-42" (rolls) or full IDs ("2018007"). Returns the roll numbers and anything not understood. */
+export function parseMissing(text: string, batch: string, dept = DEPT_CODE): { rolls: Set<number>; bad: string[] } {
+  const rolls = new Set<number>(), bad: string[] = [];
+  const roll = (t: string) => {
+    if (/^\d{1,3}$/.test(t)) return Number(t);
+    if (/^\d{7}$/.test(t) && t.startsWith(`${batch}${dept}`)) return Number(t.slice(4));
+    return NaN;
+  };
+  for (const tok of text.split(/[\s,;]+/).filter(Boolean)) {
+    const [a, b] = tok.split(/[-–]/);
+    const x = roll(a), y = b === undefined ? x : roll(b);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || y < x) { bad.push(tok); continue; }
+    for (let r = x; r <= y; r++) rolls.add(r);
+  }
+  return { rolls, bad };
+}
+
+/** Student IDs of a batch: batch (2 digits) + department code + 3-digit roll, rolls 1…count without the missing ones.
+    Batch 20, 50 students → 2018001 … 2018050. */
+export function studentIds(batch: string, count: number, missing: Set<number> = new Set(), dept = DEPT_CODE): string[] {
+  const n = Math.max(0, Math.min(999, Math.floor(count)));
+  return Array.from({ length: n }, (_, i) => i + 1).filter((r) => !missing.has(r)).map((r) => `${batch}${dept}${String(r).padStart(3, '0')}`);
+}
+
 // ---------------------------------------------------------------- template
-/** The marksheet template: a hidden key row, then assessment / item / COs / max marks header rows, then one row per student. */
-export function buildTemplate(X: XLSX, a: { title: string; columns: MarkColumn[]; roster: { studentNo: string; name: string }[] }): XLSXNS.WorkBook {
+/** The marksheet template: a hidden key row, then assessment / item / COs / max marks header rows, then one row per student ID. */
+export function buildTemplate(X: XLSX, a: { title: string; columns: MarkColumn[]; studentIds: string[] }): XLSXNS.WorkBook {
   const rows: (string | number | null)[][] = [
-    [KEY_LABEL, '', ...a.columns.map((c) => c.id)],
-    ['Assessment', '', ...a.columns.map((c) => c.assessment)],
-    ['Question part / criterion', '', ...a.columns.map((c) => c.label)],
-    ['COs assessed', '', ...a.columns.map((c) => c.cos.join(', '))],
-    [MAX_LABEL, '', ...a.columns.map((c) => c.max)],
-    ['Student ID', 'Name', ...a.columns.map(() => null)],
-    ...(a.roster.length ? a.roster : Array.from({ length: 5 }, () => ({ studentNo: '', name: '' })))
-      .map((s) => [s.studentNo, s.name, ...a.columns.map(() => null)]),
+    [KEY_LABEL, ...a.columns.map((c) => c.id)],
+    ['Assessment', ...a.columns.map((c) => c.assessment)],
+    ['Question part / criterion', ...a.columns.map((c) => c.label)],
+    ['COs assessed', ...a.columns.map((c) => c.cos.join(', '))],
+    [MAX_LABEL, ...a.columns.map((c) => c.max)],
+    ['Student ID', ...a.columns.map(() => null)],
+    ...(a.studentIds.length ? a.studentIds : Array.from({ length: 5 }, () => '')).map((id) => [id, ...a.columns.map(() => null)]),
   ];
   const ws = X.utils.aoa_to_sheet(rows);
   ws['!rows'] = [{ hidden: true }];
-  ws['!cols'] = [{ wch: 14 }, { wch: 26 }, ...a.columns.map((c) => ({ wch: Math.min(28, Math.max(10, c.label.length + 2)) }))];
-  ws['!freeze'] = { xSplit: 2, ySplit: 6 };
+  ws['!cols'] = [{ wch: 24 }, ...a.columns.map((c) => ({ wch: Math.min(28, Math.max(10, c.label.length + 2)) }))];
+  ws['!freeze'] = { xSplit: 1, ySplit: 6 };
   const help = X.utils.aoa_to_sheet([
     [a.title],
     [],
     ['How to fill this marksheet'],
-    ['1. One row per student, from row 7 of the Marks sheet. Keep the student ID in column A.'],
+    ['1. One row per student ID, from row 7 of the Marks sheet. Delete the row of a student who did not take the course; add a row (ID in column A) for anyone missing.'],
     ['2. Enter the marks obtained for each question part or criterion. Decimals are fine; a mark cannot exceed the Max marks row.'],
     ['3. Type A (absent) where the student missed it: it counts as 0, as in the department workbooks.'],
     ['4. Type EX (exempt) only where the student was officially excused: that item is left out of that student\'s CO totals.'],
@@ -102,7 +129,7 @@ export function parseMarksheet(X: XLSX, wb: XLSXNS.WorkBook, columns: MarkColumn
   if (!colOf.size && itemRow > 0) {
     const asRow = rows[itemRow - 1] ?? [];
     (rows[itemRow] ?? []).forEach((v, i) => {
-      if (i < 2) return;
+      if (i < 1) return;
       const hit = columns.find((c) => !([...colOf.values()].includes(c)) && c.label.toLowerCase() === cellText(v).toLowerCase()
         && c.assessment.toLowerCase() === cellText(asRow[i]).toLowerCase());
       if (hit) colOf.set(i, hit);
@@ -150,7 +177,7 @@ export function parseMarksheet(X: XLSX, wb: XLSXNS.WorkBook, columns: MarkColumn
       if (n < 0 || n > c.max + 1e-9) { issues.push({ level: 'error', message: `Row ${r + 1} (${studentNo}), ${c.label}: ${n} is outside 0–${c.max}.` }); }
       marks[c.id] = n;
     }
-    students.push({ studentNo, name: cellText(row[1]), row: r + 1, marks });
+    students.push({ studentNo, name: colOf.has(1) ? '' : cellText(row[1]), row: r + 1, marks }); // older templates had a Name column
   }
   if (!students.length && !issues.some((i) => i.level === 'error')) issues.push({ level: 'error', message: 'No student rows with marks were found.' });
   if (blanks) issues.push({ level: 'warning', message: `${blanks} blank ${blanks === 1 ? 'cell was' : 'cells were'} counted as 0. Type A for absent to make that explicit.` });
@@ -236,8 +263,8 @@ export function buildResultsWorkbook(X: XLSX, a: { title: string; result: Attain
     [], [`Thresholds: student CO ${a.t.studentCo * 100}%, cohort CO ${a.t.cohortCo * 100}%, student PO ${a.t.studentPo * 100}%, cohort PO ${a.t.cohortPo * 100}%.`],
   ]);
   const students = X.utils.aoa_to_sheet([
-    ['Student ID', 'Name', ...a.coCodes.flatMap((c) => [`${c} %`, `${c} Y/N`]), ...poCodes.flatMap((p) => [`${p} %`, `${p} Y/N`])],
-    ...r.students.map((s) => [s.studentNo, s.name,
+    ['Student ID', ...a.coCodes.flatMap((c) => [`${c} %`, `${c} Y/N`]), ...poCodes.flatMap((p) => [`${p} %`, `${p} Y/N`])],
+    ...r.students.map((s) => [s.studentNo,
       ...a.coCodes.flatMap((c) => [pct(s.co[c]), yn(ge(s.co[c], a.t.studentCo))]),
       ...poCodes.flatMap((p) => [pct(s.po[p]), yn(ge(s.po[p], a.t.studentPo))])]),
   ]);

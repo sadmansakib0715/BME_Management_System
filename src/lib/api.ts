@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { humanError, supabase } from './supabase';
 import type {
-  AssessmentComponent, AssessmentItem, AttainmentRun, BugsResolution, StudentAttainment, CarReport, CoPo, Course, CourseFileItem, CourseOutcome, CourseRecord, CqiItem, CriterionCo, ExamAssignment, ObeAttainment, ObeCriterion, ObeDocs, ProgramPo, Rubric,
+  AssessmentComponent, AssessmentItem, AuditEntry, AttainmentRun, BugsResolution, StudentAttainment, CarReport, CoPo, Course, CourseFileItem, CourseOutcome, CourseRecord, CqiItem, CriterionCo, ExamAssignment, ObeAttainment, ObeCriterion, ObeDocs, ProgramPo, Rubric,
   ExamTask, Faculty, ItemDateHistory, Milestone, ModerationRound, Offering, PEO, PO, Section, SectionTeacher,
   SessionalGradesheet, Term, AllowedUser,
 } from './types';
@@ -143,6 +143,39 @@ export const useItemHistory = (itemId: string | undefined) => useQuery({
   queryFn: () => rows<ItemDateHistory>(supabase.from('item_date_history').select('*').eq('item_id', itemId!).order('changed_at', { ascending: false })),
 });
 
+// ---------------------------------------------------------------- activity log (0017)
+export interface ActivityFilter { offeringId?: string; termId?: string; actor?: string }
+export interface Activity { entries: AuditEntry[]; coCodes: Record<string, string>; more: boolean;
+  /** The database has not had 0017 yet (no course / name columns on the log). */
+  needsMigration: boolean }
+/** Newest first. CO codes for CO-PO links and assessment-map tags are looked up so the log can say "CO2 → PO3". */
+export function useActivity(f: ActivityFilter, limit = 150) {
+  return useQuery({
+    queryKey: ['activity', f, limit],
+    queryFn: async (): Promise<Activity> => {
+      let q = supabase.from('audit_log').select('*').neq('table_name', 'marks').order('at', { ascending: false }).order('id', { ascending: false }).limit(limit + 1);
+      if (f.offeringId) q = q.eq('offering_id', f.offeringId);
+      if (f.termId) q = q.eq('term_id', f.termId);
+      if (f.actor) q = q.eq('actor', f.actor);
+      const { data, error } = await q;
+      if (error) {
+        const e = error as { code?: string; message?: string };
+        if (e.code === '42703' || /offering_id|term_id|actor_name/.test(e.message ?? '')) return { entries: [], coCodes: {}, more: false, needsMigration: true };
+        throw new Error(humanError(error));
+      }
+      const all = (data ?? []) as AuditEntry[];
+      const entries = all.slice(0, limit);
+      const coIds = [...new Set(entries.filter((e) => e.table_name === 'co_po_map' || e.table_name === 'obe_criterion_cos')
+        .map((e) => String((e.new_row ?? e.old_row)?.co_id ?? '')).filter(Boolean))];
+      const cos = await rowsIn<{ id: string; code: string }>('course_outcomes', 'id', coIds, 'id, code');
+      // A deleted CO is gone from the table, but its own log entry still has its code.
+      const coCodes: Record<string, string> = Object.fromEntries(entries.filter((e) => e.table_name === 'course_outcomes').map((e) => [e.row_pk ?? '', String((e.new_row ?? e.old_row)?.code ?? '')]));
+      for (const c of cos) coCodes[c.id] = c.code;
+      return { entries, coCodes, more: all.length > limit, needsMigration: entries.length > 0 && !('offering_id' in entries[0]) };
+    },
+  });
+}
+
 // ---------------------------------------------------------------- mutations
 /** Wraps any async write: throws readable errors and refreshes term + course data afterwards. */
 export function useWrite<A, R = unknown>(fn: (a: A) => Promise<R>) {
@@ -150,7 +183,7 @@ export function useWrite<A, R = unknown>(fn: (a: A) => Promise<R>) {
   return useMutation<R, Error, A>({
     mutationFn: async (a: A) => { try { return await fn(a); } catch (e) { throw new Error(humanError(e)); } },
     // Writes are rare and the department dataset is small, so refreshing every cached view is cheap and never stale.
-    onSuccess: () => { for (const k of ['term', 'terms', 'obe', 'obeTerm', 'programPo', 'bugs', 'cqi', 'history', 'faculty', 'courses', 'allowed', 'coverage']) qc.invalidateQueries({ queryKey: [k] }); },
+    onSuccess: () => { for (const k of ['term', 'terms', 'obe', 'obeTerm', 'programPo', 'bugs', 'cqi', 'history', 'faculty', 'courses', 'allowed', 'coverage', 'activity']) qc.invalidateQueries({ queryKey: [k] }); },
   });
 }
 

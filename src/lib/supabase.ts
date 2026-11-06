@@ -4,8 +4,35 @@ const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 export const configured = Boolean(url && key);
+
+/** localStorage key of the name chosen under "Viewing as" while open access is on. */
+export const ACTING_KEY = 'bme.actingAs';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+let sendActing = true;
+/** Sends the "Viewing as" name with database requests (x-acting-as) so the activity log (0017) can say who made a change while
+    nobody signs in. Signed in, the database uses the account and ignores it. If a server ever refuses the header, it is dropped. */
+const actingFetch: typeof fetch = async (input, init) => {
+  let id: string | null = null;
+  try { id = localStorage.getItem(ACTING_KEY); } catch { /* private window */ }
+  const target = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  if (!sendActing || !id || !UUID.test(id) || !target.includes('/rest/v1/')) return fetch(input, init);
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+  headers.set('x-acting-as', id);
+  try { return await fetch(input, { ...init, headers }); }
+  catch (e) {
+    if (!(e instanceof TypeError)) throw e;
+    // Network-level failure, possibly the header being refused: stop sending it. Reads are retried at once; a write is not
+    // repeated blindly (it may have reached the server), so its error shows and trying again works.
+    sendActing = false;
+    const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+    if (method === 'GET' || method === 'HEAD') return fetch(input, init);
+    throw e;
+  }
+};
+
 export const supabase = createClient(url ?? 'http://localhost:54321', key ?? 'missing-key', {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  global: { fetch: actingFetch },
 });
 
 /** Turns a Supabase / Postgres error into one sentence a person can act on. */

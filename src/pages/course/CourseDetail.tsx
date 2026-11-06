@@ -2,6 +2,7 @@ import { clsx } from 'clsx';
 import { ChevronLeft } from 'lucide-react';
 import { lazy, Suspense } from 'react';
 import { Link, NavLink, useParams } from 'react-router-dom';
+import { ActivityLog } from '@/components/ActivityLog';
 import { TypeBadge } from '@/components/bits';
 import { Empty, ErrorNote, Spinner } from '@/components/ui';
 import { useTerm } from '@/lib/TermContext';
@@ -24,7 +25,7 @@ export default function CourseDetail() {
   const isTheory = c.course_type === 'theory';
   const tabs = [
     ['overview', 'Overview'], ['assessments', isTheory ? 'Class tests & plan' : 'Assessments'], ['exam', isTheory ? 'Exam workflow' : 'Gradesheet'],
-    ['outcomes', 'OBE'], ['progress', 'Progress tree'],
+    ['outcomes', 'OBE'], ['progress', 'Progress tree'], ['log', 'Log'],
   ] as const;
   const props = { offering: o, course: c, data };
 
@@ -52,6 +53,7 @@ export default function CourseDetail() {
         {tab === 'exam' && <ExamTab {...props} />}
         {tab === 'outcomes' && <OutcomesTab {...props} />}
         {tab === 'progress' && <ProgressTab {...props} />}
+        {tab === 'log' && <ActivityLog filter={{ offeringId: o.id }} showCourse={false} />}
       </Suspense>
     </>
   );

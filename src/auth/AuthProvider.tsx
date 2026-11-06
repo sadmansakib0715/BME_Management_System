@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { ACTING_KEY, supabase } from '@/lib/supabase';
 import type { AppRole } from '@/lib/types';
 
 interface Me { facultyId: string | null; role: AppRole }
@@ -14,7 +14,7 @@ interface AuthState {
 }
 
 const Ctx = createContext<AuthState | null>(null);
-const ACTING = 'bme.actingAs';
+const ACTING = ACTING_KEY;
 const readActing = () => { try { return localStorage.getItem(ACTING); } catch { return null; } };
 
 export function AuthProvider({ children }: { children: ReactNode }) {

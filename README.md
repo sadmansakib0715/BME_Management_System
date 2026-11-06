@@ -104,6 +104,17 @@ The database queues messages when a step unlocks, a paper is returned for correc
 deadlines (then daily while overdue, up to five days).
 
 
+### Activity log (0017)
+
+**Activity log** in the sidebar shows who scheduled, changed or removed what, newest first: e.g. “Sadman Sakib Himel scheduled
+CT 01 for Fri, 20 Nov 2026 at 10:00 · BME 203”, with the changed fields underneath. Filter by person and course, or see a course's
+own log on its **Log** tab. Rows saved together appear as one entry; a reschedule shows its reason.
+
+The database writes the log (triggers on every table the website edits, `public.tg_audit`), so nothing can be changed
+without a log line, and nobody can edit the log. Signed in, the account names the person. With open access on, the website sends
+the name chosen under **Viewing as** (`x-acting-as` header) and the log records it; changes made with no name chosen show as
+“Someone (no name)”. Existing databases run `supabase/update_activity_log.sql` once.
+
 ### Department document templates (0016)
 
 The PDFs follow the department's Word templates in `Templates/` (US Letter, 2.5 cm margins, BUET crest): **Course Outline**
@@ -123,7 +134,7 @@ problems, A1 for POs on complex engineering activities (`impliedKpa` in `src/lib
 | Course outline | OBE → Outline | Contents, objectives, assessment strategy, distribution of marks, textbooks and lecture plan; **Outline PDF** in the department's outline layout (with COs, CO–PO and K/P/A tables) |
 | COs & mapping | OBE → COs & mapping | **CO-PO mapping PDF** laid out like CO-PO Mapping.docx |
 | Rubrics | OBE → Rubrics | **Rubric PDF** (Criterion & CO mapping · Max score · bands); **Add to assessment map** puts the criteria into the marksheet |
-| Marksheet | OBE → Attainment | **Marksheet template** (.xlsx) built from the assessment map and the roster: one column per question part or criterion, its COs and max marks |
+| Marksheet | OBE → Attainment | **Marksheet template** (.xlsx) built from the assessment map: one column per question part or criterion, its COs and max marks; one row per student ID, generated from the batch, number of students and missing rolls (batch + 18 + roll, e.g. 2018001). No names |
 | Attainment | OBE → Attainment | **Upload marksheet** → checks (marks above max, duplicates, text, missing columns) → student CO% and PO%, cohort CO% and PO% (≥ 40% / ≥ 40%), highest/average/lowest scripts, **Results workbook** |
 | CAR | OBE → CAR | Part B filled from the results; **Draft from results** writes a first Part C/E; **CAR PDF** in the department's CAR layout |
 

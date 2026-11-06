@@ -144,6 +144,18 @@ do $$ begin
   if not public.app_open_access() then raise exception 'FAIL: the website could switch security'; end if;
 end $$;
 
+-- Activity log (0017): with open access, the "Viewing as" name sent in x-acting-as is recorded with the course.
+reset role; update public.app_settings set open_access = true;
+select set_config('request.headers', json_build_object('x-acting-as', (select id from public.faculty order by display_name limit 1))::text, true);
+set local role anon;
+do $$ declare a public.audit_log; begin
+  update public.assessment_items set held_on = coalesce(held_on, date '2026-01-01') + 1 where id = (select id from public.assessment_items order by id limit 1);
+  select * into a from public.audit_log where table_name = 'assessment_items' order by id desc limit 1;
+  if a.actor is null or a.actor_name is null or a.course_code is null then raise exception 'FAIL: activity log missed who or which course: %', row_to_json(a); end if;
+  begin insert into public.audit_log (table_name, action) values ('x', 'INSERT'); raise exception 'FAIL: the log can be written to';
+  exception when insufficient_privilege then null; end;
+end $$;
+
 reset role;
 select 'ALL INTEGRATION CHECKS PASSED' as result;
 rollback;

@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { describe, expect, it } from 'vitest';
-import { buildResultsWorkbook, buildTemplate, computeAttainment, coPoCodes, mapFingerprint, marksheetColumns, parseMarksheet, type MarkColumn, type StudentMarks } from '../src/lib/attainment';
+import { buildResultsWorkbook, buildTemplate, computeAttainment, coPoCodes, mapFingerprint, marksheetColumns, parseMarksheet, parseMissing, studentIds, type MarkColumn, type StudentMarks } from '../src/lib/attainment';
 import type { CriterionCo, ObeCriterion } from '../src/lib/types';
 
 const T = { studentCo: 0.4, cohortCo: 0.4, studentPo: 0.4, cohortPo: 0.4 };
@@ -76,9 +76,9 @@ describe('attainment from marks', () => {
 });
 
 describe('marksheet template', () => {
-  const roster = [{ studentNo: '2318001', name: 'A' }, { studentNo: '2318002', name: 'B' }, { studentNo: '2318003', name: 'C' }];
+  const ids = studentIds('23', 3);
   const roundTrip = (fill: (aoa: unknown[][]) => void) => {
-    const wb = buildTemplate(XLSX, { title: 'BME 203', columns: cols, roster });
+    const wb = buildTemplate(XLSX, { title: 'BME 203', columns: cols, studentIds: ids });
     const aoa = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets.Marks, { header: 1, defval: null });
     fill(aoa);
     const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -87,8 +87,30 @@ describe('marksheet template', () => {
     return parseMarksheet(XLSX, XLSX.read(buf, { type: 'array' }), cols);
   };
 
+  it('fills student IDs from batch, count and missing rolls', () => {
+    expect(studentIds('20', 50).slice(0, 2)).toEqual(['2018001', '2018002']);
+    expect(studentIds('20', 50).at(-1)).toBe('2018050');
+    const m = parseMissing('7, 23 41-42 2018049 2118003 x', '20');
+    expect([...m.rolls]).toEqual([7, 23, 41, 42, 49]);
+    expect(m.bad).toEqual(['2118003', 'x']);
+    const ids = studentIds('20', 50, m.rolls);
+    expect(ids.length).toBe(45);
+    expect(ids).not.toContain('2018007');
+    const aoa = XLSX.utils.sheet_to_json<unknown[]>(buildTemplate(XLSX, { title: 'x', columns: cols, studentIds: ids }).Sheets.Marks, { header: 1, defval: null });
+    expect(aoa[5]).toEqual(['Student ID', ...cols.map(() => null)]); // no Name column
+    expect(aoa[6][0]).toBe('2018001');
+  });
+
+  it('still reads an older template with a Name column', () => {
+    const header = [['Column key (do not edit)', '', ...cols.map((c) => c.id)], ['Student ID', 'Name', ...cols.map(() => null)], ['2318001', 'A', 15, 15, 11, 16, 11, 9]];
+    const out = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(out, XLSX.utils.aoa_to_sheet(header), 'Marks');
+    const p = parseMarksheet(XLSX, out, cols);
+    expect(p.students[0].marks.q5a).toBe(16);
+    expect(p.students[0].name).toBe('A');
+  });
+
   it('round-trips marks, A and EX through the template', () => {
-    const p = roundTrip((a) => { a[6] = ['2318001', 'A', 15, 15, 11, 16, 11, 9]; a[7] = ['2318002', 'B', 'A', 3, 0, 4, 8, 'ex']; a[8] = ['2318003', 'C', 1, 2, 3, 4, 5, 6]; });
+    const p = roundTrip((a) => { a[6] = ['2318001', 15, 15, 11, 16, 11, 9]; a[7] = ['2318002', 'A', 3, 0, 4, 8, 'ex']; a[8] = ['2318003', 1, 2, 3, 4, 5, 6]; });
     expect(p.issues.filter((i) => i.level === 'error')).toEqual([]);
     expect(p.students.map((s) => s.studentNo)).toEqual(['2318001', '2318002', '2318003']);
     expect(p.students[1].marks.q1a).toBe('absent');
@@ -97,7 +119,7 @@ describe('marksheet template', () => {
   });
 
   it('rejects marks above the maximum, duplicates and text', () => {
-    const p = roundTrip((a) => { a[6] = ['2318001', '', 16, 15, 11, 16, 11, 9]; a[7] = ['2318001', '', 1, 1, 1, 1, 1, 1]; a[8] = ['2318003', '', 'good', 1, 1, 1, 1, 1]; });
+    const p = roundTrip((a) => { a[6] = ['2318001', 16, 15, 11, 16, 11, 9]; a[7] = ['2318001', 1, 1, 1, 1, 1, 1]; a[8] = ['2318003', 'good', 1, 1, 1, 1, 1]; });
     const errs = p.issues.filter((i) => i.level === 'error').map((i) => i.message).join('\n');
     expect(errs).toMatch(/16 is outside 0–15/);
     expect(errs).toMatch(/appears twice/);
@@ -105,21 +127,21 @@ describe('marksheet template', () => {
   });
 
   it('skips students with no marks and warns about blank cells', () => {
-    const p = roundTrip((a) => { a[6] = ['2318001', '', 15, null, 11, 16, 11, 9]; });
+    const p = roundTrip((a) => { a[6] = ['2318001', 15, null, 11, 16, 11, 9]; });
     expect(p.students.length).toBe(1);
     expect(p.issues.some((i) => /no marks at all/.test(i.message))).toBe(true);
     expect(p.issues.some((i) => /1 blank cell was counted as 0/.test(i.message))).toBe(true);
   });
 
   it('falls back to column names when the hidden key row is deleted', () => {
-    const p = roundTrip((a) => { a.shift(); a[5] = ['2318001', '', 15, 15, 11, 16, 11, 9]; });
+    const p = roundTrip((a) => { a.shift(); a[5] = ['2318001', 15, 15, 11, 16, 11, 9]; });
     expect(p.students.length).toBe(1);
     expect(p.issues.some((i) => /matched by their assessment and question names/.test(i.message))).toBe(true);
   });
 
   it('flags a column missing from an old template', () => {
     const extra: MarkColumn[] = [...cols, { id: 'new', assessment: 'Term Final', label: 'Q05 (d)', max: 5, cos: ['CO4'] }];
-    const wb = buildTemplate(XLSX, { title: 'x', columns: cols, roster });
+    const wb = buildTemplate(XLSX, { title: 'x', columns: cols, studentIds: ids });
     const p = parseMarksheet(XLSX, wb, extra);
     expect(p.issues.some((i) => i.level === 'error' && /Column missing: Term Final · Q05 \(d\)/.test(i.message))).toBe(true);
   });

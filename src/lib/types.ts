@@ -56,6 +56,10 @@ export interface AssessmentComponent { id: string; offering_id: string; kind: Co
 export type ItemStatus = 'planned' | 'scheduled' | 'held' | 'postponed' | 'cancelled';
 export type MarksStatus = 'none' | 'entering' | 'verified' | 'published' | 'locked';
 export interface AssessmentItem { id: string; component_id: string; offering_id: string; section_id: string | null; seq: number; title: string; held_on: string | null; held_time: string | null; total_marks: number; status: ItemStatus; marks_status: MarksStatus; responsible: string | null; syllabus: string | null; date_later?: boolean; }
+/** One row of the activity log (audit_log, 0007 + 0017). old_row / new_row are the whole row before and after. */
+export interface AuditEntry { id: number; table_name: string; row_pk: string | null; action: 'INSERT' | 'UPDATE' | 'DELETE';
+  old_row: Record<string, unknown> | null; new_row: Record<string, unknown> | null; actor: string | null; actor_name: string | null;
+  offering_id: string | null; course_code: string | null; term_id: string | null; at: string }
 export interface ItemDateHistory { id: string; item_id: string; old_date: string | null; new_date: string | null; reason: string | null; changed_by: string | null; changed_at: string; }
 
 // Rubrics (0014, teacher-made): criteria with marks and bands, each criterion linked to COs by CO id.

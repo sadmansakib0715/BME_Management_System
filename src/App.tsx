@@ -17,6 +17,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const TermSetup = lazy(() => import('./pages/admin/TermSetup'));
 const People = lazy(() => import('./pages/admin/People'));
 const Guide = lazy(() => import('./pages/Guide'));
+const Log = lazy(() => import('./pages/Log'));
 
 function AdminOnly({ children }: { children: ReactNode }) {
   const { isAdmin } = useAuth();
@@ -70,6 +71,7 @@ export default function App() {
               <Route path="tree" element={<DeptTree />} />
             </Route>
             <Route path="outcomes" element={<Outcomes />} />
+            <Route path="log" element={<Log />} />
             <Route path="courses/:id/:tab?" element={<CourseDetail />} />
             <Route path="guide" element={<Guide isAdmin={isAdmin} />} />
             <Route path="admin/assignments" element={<Navigate to="/admin/term/people" replace />} />
