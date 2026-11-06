@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { buildCourseFolder, buildMarksTemplate, previewSources } from '../src/lib/courseFolder/build';
+import { websiteMappingDocx } from '../src/lib/courseFolder/docs';
 import { checkPlan, cosFor, planColumns, type Plan } from '../src/lib/courseFolder/plan';
 import { batchOf, computeAttainment, key, norm, parseNums, sampleStats, studentIds, Warnings, type CourseInfo, type Outline } from '../src/lib/courseFolder/model';
 
@@ -204,11 +205,40 @@ describe("the department's outline layout", () => {
     }
   });
 
+  it('uses the number of students typed on the page, not the sections sheet of the course information', async () => {
+    const info = await infoXlsx({ course_no: 'BME 999', credit_hours: 1.5, level: 3, term: 1, semester: 'July 2025', session: '2022-2023' }, [['A', 1, 60, '', '']]);
+    const src = { outline: await deptOutline(), mapping: await deptMapping(), info, roll: { semester: '', batch: '21', count: 50, missingIds: ['2118007'] } };
+    const p = await previewSources(src);
+    expect(p.warnings.some((x) => /lists 60 students .* uses the 49 entered on this page/.test(x))).toBe(true);
+    const t = await buildMarksTemplate(src, p.plan);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(t.bytes as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet('ca')!;
+    const ids: unknown[] = [];
+    for (let r = 5; r <= ws.rowCount; r++) if (ws.getCell(`A${r}`).value) ids.push(ws.getCell(`A${r}`).value);
+    expect(ids.length).toBe(49);
+    expect([ids[0], ids[ids.length - 1], ids.includes(2118007)]).toEqual([2118001, 2118050, false]);
+  });
+
   it('matches assessment names to CO assessment tools without false hits', async () => {
     const o = (tools: string[]) => ({ cos: tools.map((t, i) => ({ no: i + 1, statement: '', pos: [], domain: '', delivery: '', tools: t })) }) as unknown as Outline;
     expect(cosFor(o(['Lab Test, Continuous Assessment', 'Lab Quiz, Continuous Assessment']), 'Class Participation and Continuous Assessment')).toEqual([1, 2]);
     expect(cosFor(o(['Lab Test, Continuous Assessment', 'Lab Quiz, Continuous Assessment']), 'Lab Quiz')).toEqual([2]);
     expect(cosFor(o(['Written exams', 'CT']), 'Term Final Examination')).toEqual([1]);
     expect(cosFor(o(['CT', 'Project report']), 'Project')).toEqual([2]);
+  });
+});
+
+describe('CO-PO mapping as a Word file', () => {
+  it("fills the department's CO-PO Mapping template and adds the K/P/A table", async () => {
+    const bytes = await websiteMappingDocx(templates.coPoMapping, [
+      { no: 1, statement: 'Explain cell physiology', pos: [1], domain: 'C2', delivery: 'Lectures', tools: 'Written exams', kpa: ['K1', 'K2'] },
+      { no: 2, statement: 'Design a sensor', pos: [3, 5], domain: 'C6', delivery: 'Lectures, Project', tools: 'Project', kpa: ['K5', 'P1', 'A1'] },
+    ], [{ group: 'Knowledge Profile', codes: ['K1', 'K2', 'K3', 'K4', 'K5', 'K6', 'K7', 'K8'] }, { group: 'Complex Engineering Problem', codes: ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'] },
+      { group: 'Complex Engineering Activities', codes: ['A1', 'A2', 'A3', 'A4', 'A5'] }]);
+    const xml = await (await JSZip.loadAsync(bytes)).file('word/document.xml')!.async('string');
+    for (const t of ['Explain cell physiology', 'Design a sensor', 'PO-3, PO-5', 'Mapping of Knowledge Profile', 'Complex Engineering Activities', 'CO2']) expect(xml, t).toContain(t);
+    expect(xml.match(/✓/g)?.length).toBe(5);
+    expect(xml).not.toContain('Understand the fundamenta');   // the template's example rows are gone
   });
 });

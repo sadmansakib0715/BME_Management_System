@@ -1,9 +1,9 @@
-import { CheckCircle2, Download, FileArchive, FileSpreadsheet, FileText, FolderTree, Upload } from 'lucide-react';
+import { Check, CheckCircle2, Download, FileArchive, FileSpreadsheet, FileText, FolderTree, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Badge, Button, Callout, Card, CardHeader, Field, Input, Spinner, useToast } from '@/components/ui';
 import { DEPT_CODE, parseMissing, studentIds as rollIds } from '@/lib/attainment';
 import type { BuildResult, RollInput, Sources } from '@/lib/courseFolder/build';
-import { isSessional, type CO, type CourseInfo, type Outline } from '@/lib/courseFolder/model';
+import { batchOf, isSessional, type CO, type CourseInfo, type Outline } from '@/lib/courseFolder/model';
 import { checkPlan, type Plan } from '@/lib/courseFolder/plan';
 import { AssessmentTree } from './AssessmentTree';
 import carUrl from '@/assets/course-folder/car.docx?url';
@@ -38,10 +38,14 @@ function FilePick({ id, label, accept, file, onFile }: { id: string; label: stri
   );
 }
 
-function Step({ n, title, subtitle, children }: { n: number; title: string; subtitle: ReactNode; children: ReactNode }) {
+/** A numbered step; when it is done the number turns into a green tick. */
+function Step({ n, title, subtitle, done, children }: { n: number; title: string; subtitle: ReactNode; done?: boolean; children: ReactNode }) {
   return (
     <Card>
-      <CardHeader title={<span className="inline-flex items-center gap-2"><span className="grid place-items-center size-5 rounded-full bg-brand-soft text-brand-ink text-2xs font-bold">{n}</span>{title}</span>} subtitle={subtitle} />
+      <CardHeader title={<span className="inline-flex items-center gap-2">
+        {done ? <span className="grid place-items-center size-5 rounded-full bg-ok text-ok-fg" title="Done"><Check className="size-3.5" strokeWidth={3} aria-hidden /><span className="sr-only">Done:</span></span>
+          : <span className="grid place-items-center size-5 rounded-full bg-brand-soft text-brand-ink text-2xs font-bold">{n}</span>}
+        {title}{done && <span className="text-2xs font-medium text-ok">Done</span>}</span>} subtitle={subtitle} />
       <div className="p-4 space-y-3">{children}</div>
     </Card>
   );
@@ -73,22 +77,24 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [downloaded, setDownloaded] = useState(false);
   const fail = (e: unknown) => toast('bad', (e as Error).message ?? String(e));
 
-  // Roll range typed on the page (used only when there is no course information workbook).
+  // Student IDs: always from the roll range typed on the page (batch + 18 + roll), with or without a course information workbook.
   const batch = roll.batch.trim(), count = Number(roll.count);
-  const rollOk = /^\d{2}$/.test(batch) && Number.isInteger(count) && count >= 1 && count <= 999 && !!roll.semester.trim();
+  const rollOk = /^\d{2}$/.test(batch) && Number.isInteger(count) && count >= 1 && count <= 999;
+  const termOk = !!info || !!roll.semester.trim();
   const missing = useMemo(() => parseMissing(roll.missing, batch), [roll.missing, batch]);
   const rollInput: RollInput | null = rollOk ? { semester: roll.semester.trim(), batch, count, missingIds: [...missing.rolls].map((r) => `${batch}${DEPT_CODE}${String(r).padStart(3, '0')}`) } : null;
   const ids = rollOk ? rollIds(batch, count, missing.rolls) : [];
 
   const sources = async (): Promise<Sources> => ({ outline: await outline!.arrayBuffer(), mapping: mapping ? await mapping.arrayBuffer() : null,
-    info: info ? await info.arrayBuffer() : null, roll: info ? null : rollInput, siteCos });
-  const haveInputs = !!outline && (!!info || !!rollInput);
+    info: info ? await info.arrayBuffer() : null, roll: rollInput, siteCos });
+  const haveInputs = !!outline && termOk && (!!info || !!rollInput);
 
   // Read the outline (and mapping / course information) as soon as they are chosen, and show what was found.
   const filesKey = [outline, mapping, info].map((f) => (f ? `${f.name}:${f.size}:${f.lastModified}` : '')).join('|');
-  const rollKey = info ? '' : JSON.stringify(rollInput);
+  const rollKey = JSON.stringify(rollInput) + roll.semester;
   const lastFiles = useRef('');
   useEffect(() => {
     if (!haveInputs) { setPreview(null); setPreviewError(null); if (!outline) setPlan(null); return; }
@@ -100,6 +106,9 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
         const r = await previewSources(await sources());
         if (!live) return;
         setPreview({ info: r.info, outline: r.outline, warnings: r.warnings });
+        // A course information workbook gives the batch; put it in the box so the student IDs can be checked and changed.
+        if (!batch && info) { try { setRoll((x) => ({ ...x, batch: String(batchOf(r.info)).padStart(2, '0') })); } catch { /* no session / level */ } }
+        if (lastFiles.current !== filesKey) setDownloaded(false);
         setPreviewError(null);
         // A new file starts the tree again from the outline; a change of roll range keeps the faculty's edits.
         if (lastFiles.current !== filesKey || !plan) { setPlan(r.plan); lastFiles.current = filesKey; }
@@ -125,6 +134,7 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
       const t = await buildMarksTemplate(await sources(), plan);
       if (courseCode && t.info.courseNo.replace(/\s/g, '') !== courseCode.replace(/\s/g, '')) toast('bad', `These files are for ${t.info.courseNo}, not ${courseCode}`);
       save(t.bytes, t.fileName, XLSX_MIME);
+      setDownloaded(true);
       setTplWarnings(t.warnings.filter((x) => !preview?.warnings.includes(x)));
       toast('ok', `Marks sheet for ${t.info.courseNo} downloaded`);
     } catch (e) { fail(e); } finally { setBusy(null); }
@@ -156,23 +166,23 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
         (with the highest / average / lowest students to upload scripts for). Files are read in this browser and never stored.
       </Callout>
 
-      <Step n={1} title="Course outline and course information" subtitle="The outline gives the course details, the COs and the assessments with their weights. The department's CO-PO Mapping.docx gives each CO's POs and assessment tools when the outline has no CO table.">
+      <Step n={1} done={!!preview && !!plan && !previewError && !check?.errors.length} title="Course outline and course information" subtitle="The outline gives the course details, the COs and the assessments with their weights. The department's CO-PO Mapping.docx gives each CO's POs and assessment tools when the outline has no CO table.">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
           <div className="space-y-3">
             <FilePick id="cf-outline" label="Course outline (.docx)" accept=".docx" file={outline} onFile={(f) => { setOutline(f); setResult(null); }} />
             <FilePick id="cf-mapping" label="CO-PO mapping (.docx, optional)" accept=".docx" file={mapping} onFile={(f) => { setMapping(f); setResult(null); }} />
             <FilePick id="cf-info" label="Course information (.xlsx, optional)" accept=".xlsx" file={info} onFile={(f) => { setInfo(f); setResult(null); }} />
-            {!info && <div className="rounded border border-line p-3 space-y-2">
-              <p className="text-2xs text-muted">No course information workbook: the details come from the outline, and the student IDs from the roll range (batch + {DEPT_CODE} + roll).</p>
+            <div className="rounded border border-line p-3 space-y-2">
+              <p className="text-2xs text-muted">Students in the marks sheet: batch + {DEPT_CODE} + roll, rolls 1 to the number of students, without the missing ones.{info ? ' These replace the sections sheet of the course information workbook.' : ' Without a course information workbook the other details come from the outline.'}</p>
               <div className="grid grid-cols-2 gap-2">
-                <Field label="Term" htmlFor="cf-sem"><Input id="cf-sem" className="h-8" placeholder="e.g. July 2025" value={roll.semester} onChange={(e) => setRoll({ ...roll, semester: e.target.value })} /></Field>
+                {!info && <Field label="Term" htmlFor="cf-sem"><Input id="cf-sem" className="h-8" placeholder="e.g. July 2025" value={roll.semester} onChange={(e) => setRoll({ ...roll, semester: e.target.value })} /></Field>}
                 <Field label="Batch" htmlFor="cf-batch"><Input id="cf-batch" className="h-8" inputMode="numeric" maxLength={2} placeholder="e.g. 22" value={roll.batch} onChange={(e) => setRoll({ ...roll, batch: e.target.value.replace(/\D/g, '') })} /></Field>
                 <Field label="Number of students" htmlFor="cf-count"><Input id="cf-count" className="h-8" type="number" min={1} max={999} value={roll.count} onChange={(e) => setRoll({ ...roll, count: e.target.value })} /></Field>
                 <Field label="Missing rolls" htmlFor="cf-missing"><Input id="cf-missing" className="h-8" placeholder="e.g. 7, 23, 41-42" value={roll.missing} onChange={(e) => setRoll({ ...roll, missing: e.target.value })} /></Field>
               </div>
-              <p className="text-2xs text-muted">{rollOk && ids.length ? <>Student IDs <span className="font-mono">{ids[0]}</span> to <span className="font-mono">{ids[ids.length - 1]}</span>, {ids.length} students.</> : 'Enter the term and batch.'}
+              <p className="text-2xs text-muted">{rollOk && ids.length ? <>Student IDs <span className="font-mono">{ids[0]}</span> to <span className="font-mono">{ids[ids.length - 1]}</span>, {ids.length} students.</> : (info ? 'Enter the batch.' : 'Enter the term and batch.')}
                 {missing.bad.length > 0 && <span className="text-warn"> Not understood: {missing.bad.join(', ')}</span>}</p>
-            </div>}
+            </div>
             <div className="flex flex-wrap gap-2 pt-1">
               <a className="inline-flex items-center justify-center gap-1.5 rounded font-medium whitespace-nowrap h-8 px-2.5 text-sm bg-surface text-ink border border-line-strong hover:bg-sunken transition-colors duration-150" href={outlineTemplateUrl} download="course_outline_template.docx">
                 <FileText className="size-4" aria-hidden />Outline template (.docx)</a>
@@ -181,7 +191,7 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
           </div>
           <div className="space-y-3 min-w-0">
             {!outline ? <p className="text-sm text-muted rounded border border-dashed border-line p-4">Choose the course outline: the course details, COs and assessment tree read from it appear here to check and edit.</p>
-              : !haveInputs ? <p className="text-sm text-muted rounded border border-dashed border-line p-4">Add the course information workbook, or enter the term and batch.</p>
+              : !haveInputs ? <p className="text-sm text-muted rounded border border-dashed border-line p-4">{info ? 'Enter the batch and the number of students.' : 'Enter the term, the batch and the number of students (or add the course information workbook).'}</p>
               : reading && !preview ? <Spinner label="Reading the outline" />
               : previewError ? <Callout tone="bad" title="Could not read the files">{previewError}</Callout>
               : preview && plan ? <>
@@ -199,12 +209,12 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
         </div>
       </Step>
 
-      <Step n={2} title="Marks sheet" subtitle="Built from the assessment tree above: one column per assessment with its marks and every CO it assesses (an assessment covering two COs stays one column, counted for both). The department theory workbook is used for theory courses assessed by attendance, class tests and the term final. No Position columns.">
+      <Step n={2} done={downloaded} title="Marks sheet" subtitle="Built from the assessment tree above: one column per assessment with its marks and every CO it assesses (an assessment covering two COs stays one column, counted for both). The department theory workbook is used for theory courses assessed by attendance, class tests and the term final. No Position columns.">
         <Button variant="primary" size="sm" icon={<Download className="size-4" aria-hidden />} disabled={!haveInputs || !plan || !preview || !!check?.errors.length} loading={busy === 'template'} onClick={template}>Download marks sheet</Button>
         {tplWarnings && <Warnings list={tplWarnings} />}
       </Step>
 
-      <Step n={3} title="Upload the filled marks and build the folder" subtitle="Abs (or Absent) marks an absent student: absent in every item of a CO leaves them out of that CO; absent in some counts as 0. Thresholds: 40% for students and cohort.">
+      <Step n={3} done={!!result} title="Upload the filled marks and build the folder" subtitle="Abs (or Absent) marks an absent student: absent in every item of a CO leaves them out of that CO; absent in some counts as 0. Thresholds: 40% for students and cohort.">
         <FilePick id="cf-marks" label="Filled marks sheet (.xlsx)" accept=".xlsx" file={marks} onFile={(f) => { setMarks(f); setResult(null); }} />
         <FilePick id="cf-prev" label="Last term's marks workbook (optional)" accept=".xlsx" file={previous} onFile={setPrevious} />
         <p className="text-2xs text-subtle">The optional file is last term's generated “…-CO-PO-Assessment-marks.xlsx”; it fills the CAR's previous-term table.</p>

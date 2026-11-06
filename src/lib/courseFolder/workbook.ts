@@ -567,7 +567,7 @@ export async function courseInfoTemplate(): Promise<Uint8Array> {
       ['BME 211', 3, 3, 2, 2, 'July 2025', '2023-2024', 'January 2024', '', '', '', '', '']],
     ['faculties', ['name', 'section', 'office_room', 'email', 'telephone', 'consultation'], ['Teacher Name', '', 'ECE-1121', 'teacher@bme.buet.ac.bd', '+880 1XXXXXXXXX', 'Sunday 2:00-3:00 PM']],
     ['routine', ['section', 'day', 'start_time', 'end_time'], ['', 'Sunday', '09:00 AM', '09:50 AM']],
-    ['sections', ['section', 'first_roll', 'last_roll', 'extra_ids', 'exclude_ids'], ['A', 1, 60, '', '']],
+    ['sections', ['section', 'first_roll', 'last_roll', 'extra_ids', 'exclude_ids'], ['A', 1, 50, '', '']],
   ];
   for (const [name, cols, example] of sheets) {
     const ws = wb.addWorksheet(name);

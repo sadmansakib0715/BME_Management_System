@@ -1,10 +1,10 @@
 // The Word documents of the course folder. CAR, CO-PO Mapping and Instructors & Schedule fill copies of the
 // department's own BME 211 files (src/assets/course-folder/*.docx); the attainment report is generated.
 import JSZip from 'jszip';
-import type { Element } from '@xmldom/xmldom';
+import { DOMParser, type Element } from '@xmldom/xmldom';
 import {
   clean, COHORT_THRESHOLD, draftAttainmentComment, fmtNum, fmtPct, isSessional, levelTerm, MAX_CO, MAX_PO, PLACEHOLDER, STUDENT_THRESHOLD,
-  type Attainment, type CourseInfo, type Marks, type Outline, type Rec, type Sample,
+  type Attainment, type CO, type CourseInfo, type Marks, type Outline, type Rec, type Sample,
 } from './model';
 import { clone, desc, DocxPackage, esc, getW, insertAfter, kid, kids, paraText, remove, setCellLines, setParaAfterLabel, setParaText, setW, W, wEl } from './xml';
 
@@ -17,7 +17,7 @@ function importNode(pkg: DocxPackage, el: unknown): Element {
 }
 
 // ------------------------------------------------------------------ CO-PO Mapping
-export async function coPoMappingDocx(template: ArrayBuffer | Uint8Array, o: Outline): Promise<Uint8Array> {
+export async function coPoMappingDocx(template: ArrayBuffer | Uint8Array, o: Pick<Outline, 'cos' | 'kpaTable'>): Promise<Uint8Array> {
   const pkg = await DocxPackage.open(template);
   const t = pkg.tables()[0];
   const [, proto, ...rest] = rows(t);
@@ -35,6 +35,30 @@ export async function coPoMappingDocx(template: ArrayBuffer | Uint8Array, o: Out
     for (const el of [wEl(pkg.doc, 'p'), title, importNode(pkg, o.kpaTable)]) pkg.body.insertBefore(el, sect);
   }
   return pkg.save();
+}
+
+/** The Knowledge Profile / Complex Engineering Problem / Complex Engineering Activities table as a Word table:
+    two header rows (group, then K1… P1… A1…) and one row per CO with a tick under each of its codes. */
+export function kpaTableElement(cos: { no: number; kpa: string[] }[], groups: { group: string; codes: string[] }[]): Element {
+  const codes = groups.flatMap((g) => g.codes);
+  const first = 900, each = Math.floor(8460 / Math.max(1, codes.length));
+  const border = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map((b) => `<w:${b} w:val="single" w:sz="4" w:space="0" w:color="000000"/>`).join('');
+  const tc = (text: string, o: { span?: number; vMerge?: 'restart' | 'continue'; bold?: boolean; shade?: boolean; w: number }) =>
+    `<w:tc><w:tcPr><w:tcW w:w="${o.w}" w:type="dxa"/>${o.span && o.span > 1 ? `<w:gridSpan w:val="${o.span}"/>` : ''}`
+    + `${o.vMerge ? `<w:vMerge${o.vMerge === 'restart' ? ' w:val="restart"' : ''}/>` : ''}${o.shade ? '<w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>' : ''}<w:vAlign w:val="center"/></w:tcPr>`
+    + `<w:p><w:pPr><w:spacing w:before="0" w:after="0"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr>${o.bold ? '<w:b/>' : ''}<w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">${esc(text)}</w:t></w:r></w:p></w:tc>`;
+  const head1 = tc('CO', { vMerge: 'restart', bold: true, shade: true, w: first }) + groups.map((g) => tc(g.group, { span: g.codes.length, bold: true, shade: true, w: each * g.codes.length })).join('');
+  const head2 = tc('', { vMerge: 'continue', shade: true, w: first }) + codes.map((c) => tc(c, { bold: true, shade: true, w: each })).join('');
+  const body = cos.map((c) => `<w:tr>${tc(`CO${c.no}`, { bold: true, w: first })}${codes.map((k) => tc(c.kpa.includes(k) ? '✓' : '', { w: each })).join('')}</w:tr>`).join('');
+  const xml = `<w:tbl xmlns:w="${W}"><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:jc w:val="center"/><w:tblBorders>${border}</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr>`
+    + `<w:tblGrid><w:gridCol w:w="${first}"/>${codes.map(() => `<w:gridCol w:w="${each}"/>`).join('')}</w:tblGrid>`
+    + `<w:tr><w:trPr><w:tblHeader/></w:trPr>${head1}</w:tr><w:tr><w:trPr><w:tblHeader/></w:trPr>${head2}</w:tr>${body}</w:tbl>`;
+  return new DOMParser().parseFromString(xml, 'text/xml').documentElement as unknown as Element;
+}
+
+/** CO-PO Mapping.docx from the website's COs: the department's template filled with the CO table, then the K/P/A table. */
+export async function websiteMappingDocx(template: ArrayBuffer | Uint8Array, cos: (CO & { kpa: string[] })[], groups: { group: string; codes: string[] }[]): Promise<Uint8Array> {
+  return coPoMappingDocx(template, { cos, kpaTable: cos.some((c) => c.kpa.length) ? kpaTableElement(cos, groups) : null });
 }
 
 // ------------------------------------------------------------------ Instructors and Schedule

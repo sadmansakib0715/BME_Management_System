@@ -1,10 +1,11 @@
-import { Copy, FileDown, Plus, Trash2, Wand2 } from 'lucide-react';
+import { Copy, FileDown, FileText, Plus, Trash2, Wand2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Callout, Card, CardHeader, Empty, Field, SegTabs, Select, Textarea, useToast } from '@/components/ui';
 import { must, useBugs, usePOs, useWrite } from '@/lib/api';
 import { coWarnings, CULMINATING_POS, DELIVERY, DOMAIN_LEVELS, impliedKpa, KPA, kpaAfterPoChange, sortKpa, TOOLS } from '@/lib/obe';
 import { supabase } from '@/lib/supabase';
 import type { CourseOutcome } from '@/lib/types';
+import coPoTemplateUrl from '@/assets/course-folder/co_po_mapping.docx?url';
 import CoPoBoard from './CoPoBoard';
 import { coRows, poRefs, save as saveFile } from './docData';
 import { Chips, type ObeProps } from './shared';
@@ -68,8 +69,23 @@ export default function CoMapping({ offering, course, data, obe, canEdit, isAdmi
     saveFile(mappingPdf({ course: info, cos: coRows(obe), pos: poRefs(poList), approval: res ? `BUGS meeting ${res.meeting_no}${res.held_on ? `, ${res.held_on}` : ''}` : null }),
       `${course.code} CO-PO Mapping ${data.term.name}.pdf`);
   };
-  const pdfButton = <Button size="sm" icon={<FileDown className="size-4" aria-hidden />} disabled={dirty || !obe.cos.length}
-    title={dirty ? 'Save first: the PDF uses the saved COs and mapping' : undefined} onClick={() => downloadPdf().catch((e) => toast('bad', e.message))}>CO-PO mapping PDF</Button>;
+  /** The same mapping as a Word file, in the department's CO-PO Mapping.docx layout, for editing or the course file. */
+  const downloadDocx = async () => {
+    const [{ websiteMappingDocx }, tpl] = await Promise.all([import('@/lib/courseFolder/docs'), fetch(coPoTemplateUrl).then((r) => r.arrayBuffer())]);
+    const rows = coRows(obe).map((c, i) => ({ no: i + 1, statement: c.statement, pos: c.pos.map((p) => Number(p.replace(/\D/g, ''))).sort((a, b) => a - b),
+      domain: c.domains.join(', '), delivery: c.delivery.join(', '), tools: c.tools.join(', '), kpa: c.kpa }));
+    const bytes = await websiteMappingDocx(tpl, rows, KPA.map((g) => ({ group: g.group === 'Knowledge profile' ? 'Knowledge Profile' : g.group === 'Complex problem' ? 'Complex Engineering Problem' : 'Complex Engineering Activities', codes: g.items.map(([k]) => k) })));
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `${course.code} CO-PO Mapping ${data.term.name}.docx`.replace(/[^\w.-]+/g, '_') });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+  const pdfButton = <>
+    <Button size="sm" icon={<FileDown className="size-4" aria-hidden />} disabled={dirty || !obe.cos.length}
+      title={dirty ? 'Save first: the PDF uses the saved COs and mapping' : undefined} onClick={() => downloadPdf().catch((e) => toast('bad', e.message))}>CO-PO mapping PDF</Button>
+    <Button size="sm" icon={<FileText className="size-4" aria-hidden />} disabled={dirty || !obe.cos.length}
+      title={dirty ? 'Save first: the Word file uses the saved COs and mapping' : 'CO-PO Mapping.docx in the department layout'} onClick={() => downloadDocx().catch((e) => toast('bad', e.message))}>CO-PO mapping (.docx)</Button>
+  </>;
   const saveButton = <Button size="sm" variant="primary" disabled={!dirty || cos.some((c) => !c.statement.trim())} loading={save.isPending}
     onClick={() => save.mutate(cos, { onSuccess: () => toast('ok', 'COs and mapping saved'), onError: (e) => toast('bad', e.message) })}>Save</Button>;
 

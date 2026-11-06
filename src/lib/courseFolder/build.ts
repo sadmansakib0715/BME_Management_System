@@ -30,6 +30,17 @@ export interface RollInput { semester: string; batch: string; count: number; mis
     information workbook or else the roll range, and the website's COs for this course as a last source of the CO-PO mapping. */
 export interface Sources { outline: Bytes; mapping?: Bytes | null; info?: Bytes | null; roll?: RollInput | null; siteCos?: CO[] }
 
+/** The student IDs entered on the page replace the workbook's sections sheet (the section names are kept for the CAR). */
+function withRoll(info: CourseInfo, roll: RollInput, w: Warnings): CourseInfo {
+  const before = info.sections.some((x) => x.first_roll || x.extra_ids) ? studentIds(info) : [];
+  const out: CourseInfo = { ...info, extra: { ...info.extra, batch: roll.batch },
+    sections: [{ section: info.sections.map((x) => clean(x.section)).filter(Boolean).join(', '), first_roll: '1', last_roll: String(roll.count), extra_ids: '', exclude_ids: roll.missingIds.join(', ') }] };
+  const after = studentIds(out);
+  if (before.length && (before.length !== after.length || before.some((x, i) => x !== after[i])))
+    w.add(`the course information's sections sheet lists ${before.length} students (${before[0]} to ${before[before.length - 1]}); the marks sheet uses the ${after.length} entered on this page`);
+  return out;
+}
+
 /** Reads and cross-checks the inputs. */
 export async function readSources(s: Sources, w: Warnings): Promise<{ info: CourseInfo; outline: Outline }> {
   let outline = await readOutline(s.outline);
@@ -37,8 +48,10 @@ export async function readSources(s: Sources, w: Warnings): Promise<{ info: Cour
   if (s.siteCos?.length) outline = mergeSiteCos(outline, s.siteCos);
   if (!outline.cos.some((c) => c.pos.length)) w.add('no CO-PO mapping found: add the CO-PO Mapping.docx (or set the mapping on the OBE page), otherwise PO attainment cannot be worked out');
   let info: CourseInfo;
-  if (s.info) info = checkInfo(await readCourseInfo(s.info), outline, w);
-  else if (s.roll) info = infoFromOutline(outline, s.roll);
+  if (s.info) {
+    info = checkInfo(await readCourseInfo(s.info), outline, w);
+    if (s.roll) info = withRoll(info, s.roll, w);
+  } else if (s.roll) info = infoFromOutline(outline, s.roll);
   else throw new Error('give the course information workbook, or the batch and number of students');
   return { info, outline };
 }
