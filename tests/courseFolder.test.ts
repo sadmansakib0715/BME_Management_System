@@ -293,6 +293,21 @@ describe("the department's outline layout", () => {
     expect(res.warnings.some((w) => /could not be laid out/.test(w))).toBe(false);
   }, 30000);
 
+  it('puts the marks sheet columns in the order set on the page', async () => {
+    const src = { outline: await deptOutline(), mapping: await deptMapping(), roll: { semester: 'July 2025', batch: '21', count: 2, missingIds: [] } };
+    const { plan } = await previewSources(src);
+    expect(plan.items.map((i) => i.name)).toEqual(['Quiz', 'Continuous Assessment', 'Project']);   // the outline's order
+    plan.items = [plan.items[2], plan.items[0], plan.items[1]];                                     // the faculty moves Project first
+    const t = await buildMarksTemplate(src, plan);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(t.bytes as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet('ca')!;
+    expect([1, 2, 3].map((r) => [2, 3, 4].map((c) => ws.getCell(r, c).value))).toEqual([['Project', 'Quiz', 'Continuous Assessment'], ['CO1, CO2', 'CO3', 'CO1'], [75, 30, 45]]);
+    [[75, 15, 45], [15, 12, 9]].forEach((r, i) => r.forEach((v, k) => (ws.getCell(5 + i, 2 + k).value = v)));
+    const res = await buildCourseFolder({ ...src, marks: new Uint8Array(await wb.xlsx.writeBuffer()), templates });
+    expect(Object.fromEntries([...res.attainment.co].map(([k, v]) => [k, v.pct]))).toEqual({ 1: 50, 2: 50, 3: 100 });   // read by the column headers, whatever the order
+  }, 30000);
+
   it('matches assessment names to CO assessment tools without false hits', async () => {
     const o = (tools: string[]) => ({ cos: tools.map((t, i) => ({ no: i + 1, statement: '', pos: [], domain: '', delivery: '', tools: t })) }) as unknown as Outline;
     expect(cosFor(o(['Lab Test, Continuous Assessment', 'Lab Quiz, Continuous Assessment']), 'Class Participation and Continuous Assessment')).toEqual([1, 2]);

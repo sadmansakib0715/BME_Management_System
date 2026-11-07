@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { Button, Input, Select } from '@/components/ui';
 import type { CO } from '@/lib/courseFolder/model';
 import { canUseTheory, kindOf, type Plan, type PlanItem } from '@/lib/courseFolder/plan';
@@ -18,6 +18,14 @@ export function AssessmentTree({ plan, onChange, cos, courseLabel, sessional, di
   };
   const setPct = (k: number, pct: number) => setItem(k, { ...plan.items[k], pct, marks: r2((plan.total * pct) / 100) });
   const add = () => onChange({ ...plan, items: [...plan.items, { name: '', pct: 0, kind: 'other', cos: [], marks: 0, count: 1 }] });
+  /** Moves an assessment up or down: the marks sheet's columns follow this order. */
+  const move = (k: number, d: -1 | 1) => {
+    const j = k + d;
+    if (j < 0 || j >= plan.items.length) return;
+    const items = [...plan.items];
+    [items[k], items[j]] = [items[j], items[k]];
+    onChange({ ...plan, items });
+  };
   const remove = (k: number) => onChange({ ...plan, items: plan.items.filter((_, j) => j !== k) });
   const pct = plan.items.reduce((a, i) => a + i.pct, 0), marks = plan.items.reduce((a, i) => a + i.marks, 0);
   const theoryOk = canUseTheory(plan.items);
@@ -37,14 +45,22 @@ export function AssessmentTree({ plan, onChange, cos, courseLabel, sessional, di
           <span className={`tabular text-2xs ${Math.abs(pct - 100) > 0.01 || Math.abs(marks - plan.total) > 0.01 ? 'text-warn font-semibold' : 'text-muted'}`}>{fmt(pct)}% · {fmt(marks)} / {fmt(plan.total)} marks</span>
         </div>
         <div className="hidden sm:flex items-center gap-2 px-3 pt-2 text-2xs font-semibold uppercase tracking-wide text-subtle" aria-hidden>
-          <span className="w-3" /><span className="flex-1 min-w-40">Assessment (from the outline)</span><span className="w-[5.5rem] text-right">Weight</span>
+          <span className="w-16">{plan.layout === 'columns' ? 'Column' : ''}</span><span className="flex-1 min-w-40">Assessment (from the outline)</span><span className="w-[5.5rem] text-right">Weight</span>
           <span className="w-20 text-right">Marks</span><span className="w-24 text-center">How many taken</span>{!disabled && <span className="w-8" />}
         </div>
         <ul className="divide-y divide-line">
           {plan.items.map((it, k) => (
             <li key={k} className="px-3 py-2.5 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span aria-hidden className="text-subtle">{k === plan.items.length - 1 ? '└' : '├'}</span>
+                <div className="w-16 flex items-center gap-0.5">
+                  <span className="w-5 text-2xs text-muted tabular text-right" title={plan.layout === 'columns' ? `Column ${k + 1} of the marks sheet` : undefined}>{k + 1}</span>
+                  {!disabled && <div className="flex flex-col">
+                    <button type="button" className="h-4 w-6 grid place-items-center rounded text-muted hover:text-ink hover:bg-sunken disabled:opacity-30 cursor-pointer disabled:cursor-default"
+                      disabled={k === 0} aria-label={`Move ${it.name || 'assessment'} up`} title="Move up (earlier column)" onClick={() => move(k, -1)}><ChevronUp className="size-3.5" aria-hidden /></button>
+                    <button type="button" className="h-4 w-6 grid place-items-center rounded text-muted hover:text-ink hover:bg-sunken disabled:opacity-30 cursor-pointer disabled:cursor-default"
+                      disabled={k === plan.items.length - 1} aria-label={`Move ${it.name || 'assessment'} down`} title="Move down (later column)" onClick={() => move(k, 1)}><ChevronDown className="size-3.5" aria-hidden /></button>
+                  </div>}
+                </div>
                 <label className="sr-only" htmlFor={`tree-name-${k}`}>Assessment name</label>
                 <Input id={`tree-name-${k}`} className="h-8 flex-1 min-w-40" disabled={disabled} placeholder="Assessment, e.g. Quiz" value={it.name}
                   onChange={(e) => setItem(k, { ...it, name: e.target.value, kind: kindOf(e.target.value) })} />
@@ -70,6 +86,7 @@ export function AssessmentTree({ plan, onChange, cos, courseLabel, sessional, di
             </li>
           ))}
         </ul>
+        <p className="px-3 pt-2 text-2xs text-subtle">{plan.layout === 'columns' ? 'Use the arrows to reorder: the marks sheet has the assessments in this order, left to right.' : 'The department theory workbook has its own fixed sheets (attendance, class tests, term final), so the order here does not change it.'}</p>
         {!disabled && <div className="px-3 py-2 border-t border-line"><Button size="sm" variant="ghost" icon={<Plus className="size-4" aria-hidden />} onClick={add}>Add assessment</Button></div>}
       </div>
     </div>
