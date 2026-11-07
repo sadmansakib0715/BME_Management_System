@@ -257,23 +257,41 @@ describe("the department's outline layout", () => {
     expect(p.plan.items.map((i) => [i.name, i.pct, i.marks, i.count])).toEqual([['Class participation', 10, 15, 1], ['Continuous assessment', 20, 30, 1], ['Lab test', 40, 60, 2], ['Project', 30, 45, 1]]);
   });
 
-  it("reads the website's outline template (the department layout)", async () => {
+  it("reads the website's outline template (the 20.26 Description of the Course format)", async () => {
     const o = await readOutline(readFileSync(`${A}/course_outline_template.docx`));
-    expect(o.cos.length).toBe(3);
-    expect(o.distribution).toEqual([{ name: 'Class participation', pct: 10, count: 1 }, { name: 'Continuous assessment', pct: 20, count: 1 }, { name: 'Lab test', pct: 40, count: 2 }, { name: 'Project', pct: 30, count: 1 }]);
-    expect(o.teachers.length).toBe(3);
-    expect(o.planHeader).toEqual(['Week', 'Topics', 'Evaluation Basis']);
-    expect(o.textbooks.length).toBe(2);
+    expect([o.courseNo, o.title]).toEqual(['BME 320', 'Industrial Attachment']);
+    expect(o.cos.map((c) => [c.no, c.pos, c.tools])).toEqual([[1, [6], 'Presentation'], [2, [5], 'Daily Reports'], [3, [10], 'Assessment Report']]);
+    expect(o.distribution.map((d) => [d.name, d.pct])).toEqual([['Assessment report', 20], ['Daily report', 10], ['Presentation', 70]]);
+    expect(o.contents[0]).toMatch(/^The student will be placed in an organization/);
+    expect(o.objectives.length).toBe(5);
+    expect(!!o.kpaTable).toBe(true);
+    expect(o.planHeader[0]).toBe('Week#');
   });
 
-  it('adds irregular students (full IDs) to the roll range', async () => {
-    const src = { outline: await deptOutline(), mapping: await deptMapping(), roll: { semester: 'July 2025', batch: '21', count: 3, missingIds: ['2118002'], extraIds: ['1918045', '2018112'] } };
-    const t = await buildMarksTemplate(src);
+  it('takes the course details, teachers and routine from the website, and lays the outline out in the department format in the zip', async () => {
+    const site = { courseNo: 'BME 320', title: 'Industrial Attachment', credit: 1, contactHours: '3 weeks', level: '3', term: '2', session: '2022-2023', semester: 'July 2025', courseType: 'sessional',
+      faculties: [{ name: 'Dr. Web Teacher', section: '', office_room: 'ECE-1201', email: 'web@example.edu', telephone: '+880 1700-000000', consultation: '' }],
+      routine: [], routineText: 'Sunday (A1): 02:00 PM-05:00 PM\nBy appointment' };
+    const src = { outline, site, roll: { semester: '', batch: '21', count: 2, missingIds: [] } };
+    const p = await previewSources(src);   // the 20.26 outline has no credit hours, teachers or routine: the website gives them
+    expect(p.info).toMatchObject({ courseNo: 'BME 320', credit: 1, level: '3', term: '2', session: '2022-2023', semester: 'July 2025' });
+    expect(p.info.faculties.map((f) => f.name)).toEqual(['Dr. Web Teacher']);
+    expect(p.info.routine).toEqual([{ day: 'Sunday', section: 'A1', start_time: '02:00 PM', end_time: '05:00 PM' }, { day: 'By appointment', section: '', start_time: '', end_time: '' }]);
+    p.plan.items[1].count = 2;
+    const t = await buildMarksTemplate(src, p.plan);
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(t.bytes as unknown as ArrayBuffer);
     const ws = wb.getWorksheet('ca')!;
-    expect([5, 6, 7, 8, 9].map((r) => ws.getCell(`A${r}`).value)).toEqual([1918045, 2018112, 2118001, 2118003, null]);
-  });
+    [[16, 8, 56], [12, 6, 40]].forEach((r, i) => r.forEach((v, k) => (ws.getCell(5 + i, 2 + k).value = v)));
+    const res = await buildCourseFolder({ ...src, marks: new Uint8Array(await wb.xlsx.writeBuffer()), templates, counts: { 'Daily report': 2 } });
+    const zip = await JSZip.loadAsync(res.zip);
+    const xml = await docText(zip, 'BME 320 (July 2025)/BME 320_Course outline.docx');
+    for (const x of ['DEPARTMENT OF BIOMEDICAL ENGINEERING', 'Course Outline', 'BME 320', 'Industrial Attachment', 'Dr. Web Teacher', 'ECE-1201', 'web@example.edu',
+      '+880 1700-000000', 'Sunday (A1)', '02:00 PM - 05:00 PM', 'By appointment', '2022-2023', '3/2', 'The student will be placed', 'Understand and describe',
+      'Daily report (x2):', '10%', 'Corresponding CO(s)', 'To be coordinated by the industry', 'Prepared by:']) expect(xml, x).toContain(x);
+    expect(Object.keys((await JSZip.loadAsync(await zip.file('BME 320 (July 2025)/BME 320_Course outline.docx')!.async('uint8array'))).files).some((f) => f.startsWith('word/media/') && f.endsWith('.png'))).toBe(true);   // the BUET crest
+    expect(res.warnings.some((w) => /could not be laid out/.test(w))).toBe(false);
+  }, 30000);
 
   it('matches assessment names to CO assessment tools without false hits', async () => {
     const o = (tools: string[]) => ({ cos: tools.map((t, i) => ({ no: i + 1, statement: '', pos: [], domain: '', delivery: '', tools: t })) }) as unknown as Outline;

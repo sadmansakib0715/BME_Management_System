@@ -131,14 +131,16 @@ problems, A1 for POs on complex engineering activities (`impliedKpa` in `src/lib
 
 **OBE → Course folder** (also on each course: OBE → *Course folder*) builds the department course file in the browser:
 
-1. Upload the **course outline** (.docx) in the department's layout (as BME 310): header fields (as lines or a table), Course Teacher(s)
-   table with the class routine, COs as a numbered list, `Assessment:` lines such as “Lab test (x2): 40%” (the (x2) sets how many were taken),
-   Weekly Schedule (Week | Topics | Evaluation Basis), Prepared by. **Outline template (.docx)** on the page is a blank outline in this layout
-   (`src/assets/course-folder/course_outline_template.docx`); the uploaded outline goes into the course folder as it is. The website's earlier
-   outline format (CO table, Distribution of Marks) is still read. When the outline has no CO table, also upload the department's **CO-PO Mapping.docx** for each CO's POs and Assessment Tool(s); on a
-   course's page the website's own COs and mapping fill in otherwise. **course_information.xlsx** is optional (sheets `info`, `faculties`,
-   `routine`, `sections`): it is checked against the outline (course no, credit hours, level/term, session; the outline's credit hours win). Without
-   it, type the term, batch, number of students and missing rolls.
+1. Fill the **Outline template (.docx)** from the page: the Academic Council's *20.26 Description of the Course* format (course title and
+   type, contents, objectives, CO table with corresponding POs, domains, delivery and assessment tools, K/P/A table, lecture plan,
+   assessment strategy, distribution of marks such as “Lab test (x2): 40%”, textbooks), and upload it. The CO table gives each CO's POs and
+   tools, so no separate CO-PO mapping is needed (one can still be uploaded for an outline without a CO table). Department-layout outlines
+   (header fields, teachers table, COs as a list) are read too. **Course details, teachers and routine come from the website**: on a
+   course's page from that course; on the OBE page from the course picked (matched automatically to the outline's course number): credit
+   and contact hours, level/term, teachers with rooms / emails / phones and the session and class routine from the course's Outline page.
+   course_information.xlsx is optional. The course folder's `<course>_Course outline.docx` is then **generated in the department layout**
+   (BUET crest, header block, teachers table with the routine, contents, objectives, COs, assessment with "(x2)", textbooks, weekly
+   schedule, prepared by: `src/lib/courseFolder/outlineDoc.ts`).
 2. Beside the uploads the page shows what was read (course details, teachers, COs with their POs and tools) and the **assessment tree**: each
    assessment from the outline with its weight, its marks (credit hours × 100 × weight) and the COs whose Assessment Tool(s) name it. It can be
    edited: rename, change a weight, tick COs, add or remove assessments.

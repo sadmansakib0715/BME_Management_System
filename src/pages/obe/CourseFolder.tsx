@@ -1,11 +1,13 @@
 import { Check, CheckCircle2, Download, FileArchive, FileSpreadsheet, FileText, FolderTree, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Badge, Button, Callout, Card, CardHeader, Field, Input, Spinner, useToast } from '@/components/ui';
+import { Badge, Button, Callout, Card, CardHeader, Field, Input, Select, Spinner, useToast } from '@/components/ui';
 import { DEPT_CODE, parseIrregular, parseMissing, studentIds as rollIds, withIrregular } from '@/lib/attainment';
 import type { BuildResult, RollInput, Sources } from '@/lib/courseFolder/build';
 import { batchOf, isSessional, type CO, type CourseInfo, type Outline } from '@/lib/courseFolder/model';
 import { checkPlan, planCounts, type Plan } from '@/lib/courseFolder/plan';
 import { AssessmentTree } from './AssessmentTree';
+import { useSiteInfo } from './useSiteInfo';
+import { useTerm } from '@/lib/TermContext';
 import carUrl from '@/assets/course-folder/car.docx?url';
 import coPoUrl from '@/assets/course-folder/co_po_mapping.docx?url';
 import instructorsUrl from '@/assets/course-folder/instructors_and_schedule.docx?url';
@@ -62,8 +64,13 @@ function Warnings({ list }: { list: string[] }) {
 
 type Preview = { info: CourseInfo; outline: Outline; warnings: string[] };
 
-export default function CourseFolder({ courseCode, siteCos, termName }: { courseCode?: string; siteCos?: CO[]; termName?: string }) {
+export default function CourseFolder({ courseCode, siteCos, termName, offeringId }: { courseCode?: string; siteCos?: CO[]; termName?: string; offeringId?: string }) {
   const toast = useToast();
+  const { data: termData, courseOf } = useTerm();
+  // Course details, teachers and routine come from the website: this course, or (on the OBE page) the course picked / matched to the outline.
+  const [picked, setPicked] = useState('');
+  const courseOptions = (termData?.offerings ?? []).map((o) => ({ id: o.id, code: courseOf(o)?.code ?? '', title: courseOf(o)?.title ?? '' })).filter((x) => x.code).sort((a, b) => a.code.localeCompare(b.code));
+  const { site } = useSiteInfo(offeringId ?? (picked || undefined));
   const [info, setInfo] = useState<File | null>(null);
   const [outline, setOutline] = useState<File | null>(null);
   const [mapping, setMapping] = useState<File | null>(null);
@@ -83,19 +90,19 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
   // Student IDs: always from the roll range typed on the page (batch + 18 + roll), with or without a course information workbook.
   const batch = roll.batch.trim(), count = Number(roll.count);
   const rollOk = /^\d{2}$/.test(batch) && Number.isInteger(count) && count >= 1 && count <= 999;
-  const termOk = !!info || !!roll.semester.trim();
+  const termOk = !!info || !!site || !!roll.semester.trim();
   const missing = useMemo(() => parseMissing(roll.missing, batch), [roll.missing, batch]);
   const irregular = useMemo(() => parseIrregular(roll.irregular), [roll.irregular]);
   const rollInput: RollInput | null = rollOk ? { semester: roll.semester.trim(), batch, count, missingIds: [...missing.rolls].map((r) => `${batch}${DEPT_CODE}${String(r).padStart(3, '0')}`), extraIds: irregular.ids } : null;
   const ids = rollOk ? withIrregular(rollIds(batch, count, missing.rolls), irregular.ids) : [];
 
   const sources = async (): Promise<Sources> => ({ outline: await outline!.arrayBuffer(), mapping: mapping ? await mapping.arrayBuffer() : null,
-    info: info ? await info.arrayBuffer() : null, roll: rollInput, siteCos });
+    info: info ? await info.arrayBuffer() : null, roll: rollInput, siteCos, site });
   const haveInputs = !!outline && termOk && (!!info || !!rollInput);
 
   // Read the outline (and mapping / course information) as soon as they are chosen, and show what was found.
   const filesKey = [outline, mapping, info].map((f) => (f ? `${f.name}:${f.size}:${f.lastModified}` : '')).join('|');
-  const rollKey = JSON.stringify(rollInput) + roll.semester;
+  const rollKey = JSON.stringify(rollInput) + roll.semester + JSON.stringify(site);
   const lastFiles = useRef('');
   useEffect(() => {
     if (!haveInputs) { setPreview(null); setPreviewError(null); if (!outline) setPlan(null); return; }
@@ -121,6 +128,16 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
   }, [filesKey, rollKey, haveInputs]);
 
   const check = plan && preview ? checkPlan(plan, preview.outline) : null;
+
+  // On the OBE page: link the outline to this term's course with the same number.
+  const matchCourse = async (f: File) => {
+    try {
+      const { readOutline } = await import('@/lib/courseFolder/inputs');
+      const no = (await readOutline(await f.arrayBuffer(), { requireCos: false })).courseNo.replace(/\s+/g, '').toUpperCase();
+      const hit = courseOptions.find((c) => c.code.replace(/\s+/g, '').toUpperCase() === no);
+      if (hit) setPicked(hit.id);
+    } catch { /* the preview reports a file it cannot read */ }
+  };
 
   const blankInfo = async () => {
     setBusy('blank');
@@ -167,11 +184,19 @@ export default function CourseFolder({ courseCode, siteCos, termName }: { course
         (with the highest / average / lowest students to upload scripts for). Files are read in this browser and never stored.
       </Callout>
 
-      <Step n={1} done={!!preview && !!plan && !previewError && !check?.errors.length} title="Course outline and course information" subtitle="The outline gives the course details, the COs and the assessments with their weights. The department's CO-PO Mapping.docx gives each CO's POs and assessment tools when the outline has no CO table.">
+      <Step n={1} done={!!preview && !!plan && !previewError && !check?.errors.length} title="Course outline and course information" subtitle="Fill the Outline template (the 20.26 Description of the Course format: CO table with POs and assessment tools, lecture plan, distribution of marks) and upload it. Course details, teachers and routine come from the website, so they are not typed again; the course folder gets the outline in the department layout.">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
           <div className="space-y-3">
-            <FilePick id="cf-outline" label="Course outline (.docx)" accept=".docx" file={outline} onFile={(f) => { setOutline(f); setResult(null); }} />
-            <FilePick id="cf-mapping" label="CO-PO mapping (.docx, optional)" accept=".docx" file={mapping} onFile={(f) => { setMapping(f); setResult(null); }} />
+            <FilePick id="cf-outline" label="Course outline (.docx)" accept=".docx" file={outline} onFile={(f) => { setOutline(f); setResult(null); if (f && !offeringId) matchCourse(f); }} />
+            {offeringId ? <p className="text-2xs text-muted -mt-1">Course details, teachers and routine: from this course on the website{site ? ` (${site.courseNo})` : ''}.</p> : (
+              <div className="flex flex-wrap items-center gap-2">
+                <label htmlFor="cf-course" className="text-2xs text-muted">Course on the website (details, teachers, routine)</label>
+                <Select id="cf-course" className="h-8 w-auto max-w-full" value={picked} onChange={(e) => setPicked(e.target.value)}>
+                  <option value="">Not linked</option>
+                  {courseOptions.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.title}</option>)}
+                </Select>
+              </div>)}
+            <FilePick id="cf-mapping" label="CO-PO mapping (.docx, only if the outline has no CO table)" accept=".docx" file={mapping} onFile={(f) => { setMapping(f); setResult(null); }} />
             <FilePick id="cf-info" label="Course information (.xlsx, optional)" accept=".xlsx" file={info} onFile={(f) => { setInfo(f); setResult(null); }} />
             <div className="rounded border border-line p-3 space-y-2">
               <p className="text-2xs text-muted">Students in the marks sheet: batch + {DEPT_CODE} + roll, rolls 1 to the number of students, without the missing ones.{info ? ' These replace the sections sheet of the course information workbook.' : ' Without a course information workbook the other details come from the outline.'}</p>

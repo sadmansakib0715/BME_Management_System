@@ -2,11 +2,12 @@
 // laid out like the department's BME 211 (theory) and BME 310 (sessional) folders.
 import JSZip from 'jszip';
 import { carDocx, coPoMappingDocx, instructorsDocx, reportDocx } from './docs';
-import { checkInfo, infoFromOutline, loadWorkbook, mergeMapping, mergeSiteCos, readCourseInfo, readOutline } from './inputs';
+import { checkInfo, infoFromOutline, loadWorkbook, mergeMapping, mergeSiteCos, parseRoutine, readCourseInfo, readOutline } from './inputs';
 import {
-  clean, computeAttainment, fmtNum, initials, isSessional, safeName, sampleStats, studentIds,
-  type Attainment, type CO, type CourseInfo, type Marks, type Outline, type Sample, Warnings,
+  clean, computeAttainment, fmtNum, initials, norm, isSessional, safeName, sampleStats, studentIds,
+  type Attainment, type CO, type CourseInfo, type Marks, type Outline, type Sample, type SiteInfo, Warnings,
 } from './model';
+import { departmentOutlineDocx } from './outlineDoc';
 import { numberedFolders, planFromOutline, type Plan } from './plan';
 import { courseWorkbook, marksTemplate, readCounts, readPrevious, readSessionalMarks, readTheoryWorkbook, sessionalInputs } from './workbook';
 
@@ -28,7 +29,27 @@ export interface BuildResult {
 export interface RollInput { semester: string; batch: string; count: number; missingIds: string[]; /** irregular students, full IDs */ extraIds?: string[] }
 /** What the faculty gives: the course outline (required), the CO-PO Mapping.docx when the outline has no CO table, the course
     information workbook or else the roll range, and the website's COs for this course as a last source of the CO-PO mapping. */
-export interface Sources { outline: Bytes; mapping?: Bytes | null; info?: Bytes | null; roll?: RollInput | null; siteCos?: CO[] }
+export interface Sources { outline: Bytes; mapping?: Bytes | null; info?: Bytes | null; roll?: RollInput | null; siteCos?: CO[]; site?: SiteInfo | null }
+
+/** The website's course details, teachers and routine replace the workbook's / outline's (they are kept up to date there). */
+function withSite(info: CourseInfo, site: SiteInfo, o: Outline, w: Warnings): CourseInfo {
+  if (o.courseNo && norm(o.courseNo) !== norm(site.courseNo)) w.add(`the outline is for '${o.courseNo}' but this is ${site.courseNo}`);
+  const out: CourseInfo = { ...info, extra: { ...info.extra } };
+  out.courseNo = site.courseNo;
+  if (site.credit) out.credit = site.credit;
+  if (site.contactHours) out.contactHours = site.contactHours;
+  if (site.level) { out.level = site.level; out.term = site.term ?? out.term; }
+  if (site.session) out.session = site.session;
+  if (site.semester) out.semester = site.semester;
+  if (site.courseType) out.extra.course_type = site.courseType;
+  if (site.title) out.extra.title = site.title;
+  if (site.faculties.length) out.faculties = site.faculties;
+  // The routine typed on the Outline page: one row per class; a line that is not "Day (A1): 09:00 AM-11:00 AM" is kept as it is.
+  const typed = (site.routineText ?? '').split('\n').map(clean).filter(Boolean);
+  const routine = site.routine.length ? site.routine : typed.flatMap((l) => { const r = parseRoutine(l); return r.length ? r : [{ day: l, section: '', start_time: '', end_time: '' }]; });
+  if (routine.length) out.routine = routine;
+  return out;
+}
 
 /** The student IDs entered on the page replace the workbook's sections sheet (the section names are kept for the CAR). */
 function withRoll(info: CourseInfo, roll: RollInput, w: Warnings): CourseInfo {
@@ -48,11 +69,11 @@ export async function readSources(s: Sources, w: Warnings): Promise<{ info: Cour
   if (s.siteCos?.length) outline = mergeSiteCos(outline, s.siteCos);
   if (!outline.cos.some((c) => c.pos.length)) w.add('no CO-PO mapping found: add the CO-PO Mapping.docx (or set the mapping on the OBE page), otherwise PO attainment cannot be worked out');
   let info: CourseInfo;
-  if (s.info) {
-    info = checkInfo(await readCourseInfo(s.info), outline, w);
-    if (s.roll) info = withRoll(info, s.roll, w);
-  } else if (s.roll) info = infoFromOutline(outline, s.roll);
+  if (s.info) info = checkInfo(await readCourseInfo(s.info), outline, w);
+  else if (s.site || s.roll) info = infoFromOutline(outline, { semester: s.roll?.semester ?? '', batch: s.roll?.batch ?? '', count: s.roll?.count ?? 0, missingIds: s.roll?.missingIds ?? [], extraIds: s.roll?.extraIds }, s.site);
   else throw new Error('give the course information workbook, or the batch and number of students');
+  if (s.site) info = withSite(info, s.site, outline, w);
+  if (s.roll && s.info) info = withRoll(info, s.roll, w);
   return { info, outline };
 }
 
@@ -105,7 +126,9 @@ export async function buildCourseFolder(a: Sources & { marks: Bytes; previous?: 
   const asm = dir.folder(isSessional(info) ? 'Assessment and Scripts' : 'Assessments and scripts')!;
   const lec = dir.folder('Lecture Materials')!;
 
-  dir.file(`${cno}_Course outline.docx`, a.outline);
+  // The outline in the department's layout (BUET crest, teachers and routine from the website); the uploaded file if that fails.
+  try { dir.file(`${cno}_Course outline.docx`, await departmentOutlineDocx(info, outline, a.counts)); }
+  catch (e) { w.add(`the course outline could not be laid out (${(e as Error).message}); the uploaded file is used`); dir.file(`${cno}_Course outline.docx`, a.outline); }
   dir.file('CO-PO Mapping.docx', await coPoMappingDocx(a.templates.coPoMapping, outline));
   dir.file('Instructors and Schedule.docx', await instructorsDocx(a.templates.instructors, info));
   dir.file('CAR.docx', await carDocx(a.templates.car, info, outline, att, prev));

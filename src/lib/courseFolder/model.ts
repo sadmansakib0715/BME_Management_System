@@ -29,6 +29,15 @@ export interface CourseInfo {
   sections: Rec[];
 }
 
+/** What the website knows about the course this term: course details, teachers (with rooms, emails, phones from the course's
+    outline page), the class routine and the term. These win over the course information workbook and the outline. */
+export interface SiteInfo {
+  courseNo: string; title?: string; credit?: number | null; contactHours?: string; level?: string; term?: string; session?: string;
+  semester?: string; courseType?: string; faculties: Rec[]; routine: Rec[];
+  /** The routine as typed on the course's Outline page ("Sunday: 09:00 AM-09:50 AM", one class a line). */
+  routineText?: string;
+}
+
 export interface CO { no: number; statement: string; pos: number[]; domain: string; delivery: string; tools: string }
 
 export interface Outline {
@@ -44,6 +53,9 @@ export interface Outline {
   textbooks: string[];
   /** The department outline's header block: Course No, Title, Credit / Contact hours, Level/Term, Academic Session. */
   header: { courseNo?: string; title?: string; credit?: string; contact?: string; level?: string; term?: string; session?: string };
+  /** Course Contents paragraphs and Course Objectives items, as written (for the department-layout outline). */
+  contents: string[];
+  objectives: string[];
   /** Course Teacher(s) table. */
   teachers: { name: string; room: string; email: string; phone: string }[];
   /** Class routine from the teachers table (section, day, start_time, end_time). */

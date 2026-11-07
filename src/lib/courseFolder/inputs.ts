@@ -1,7 +1,7 @@
 // Reading the faculty's inputs: course_information.xlsx and course_outline.docx.
 import ExcelJS from 'exceljs';
 import { cellText, DocxPackage, kids, paraText } from './xml';
-import { clean, fmtNum, norm, parseNums, type CO, type CourseInfo, type Outline, type Rec, type Warnings } from './model';
+import { clean, fmtNum, norm, parseNums, type CO, type CourseInfo, type Outline, type Rec, type SiteInfo, type Warnings } from './model';
 
 /** An ExcelJS cell value as a plain number / string / null (formula results, rich text and hyperlinks unwrapped). */
 export function plain(v: ExcelJS.CellValue): string | number | null {
@@ -112,7 +112,7 @@ function readHeaderLine(raw: string, h: Outline['header']) {
     The CO-PO mapping (POs, assessment tools) may instead come from the department's CO-PO Mapping.docx: see `mergeMapping`. */
 export async function readOutline(data: ArrayBuffer | Uint8Array, opts: { requireCos?: boolean } = {}): Promise<Outline> {
   const pkg = await DocxPackage.open(data);
-  const o: Outline = { courseNo: '', title: '', cos: [], coTable: null, kpaTable: null, planHeader: [], plan: [], distribution: [], textbooks: [], header: {}, teachers: [], routine: [] };
+  const o: Outline = { courseNo: '', title: '', cos: [], coTable: null, kpaTable: null, planHeader: [], plan: [], distribution: [], textbooks: [], header: {}, teachers: [], routine: [], contents: [], objectives: [] };
   const listCos: string[] = [];
   let current = '';
   for (const el of pkg.blocks()) {
@@ -134,7 +134,9 @@ export async function readOutline(data: ArrayBuffer | Uint8Array, opts: { requir
       if (current === 'distribution') {
         const d = raw.trim().match(/^(.*?)[\s\t:]+(\d+(?:\.\d+)?)\s*%/);
         if (d && clean(d[1]) && !/^total\b/i.test(d[1].trim())) o.distribution.push(distItem(d[1], Number(d[2])));
-      } else if (current === 'textbooks') o.textbooks.push(txt);
+      } else if (current === 'textbooks') o.textbooks.push(txt.replace(/^\s*\d{1,2}[.)]\s+/, ''));
+      else if (current === 'content') o.contents.push(txt);
+      else if (current === 'objectives' && !/:\s*$/.test(txt)) o.objectives.push(txt.replace(/^\s*[•●○◦▪■\-–*]\s+/, ''));
       else if (current === 'outcomes' && !/:\s*$/.test(txt)) listCos.push(txt.replace(/^(CO\s*-?\s*\d+|\d+)\s*[.):-]\s*/i, ''));
     } else {
       const rows = kids(el, 'tr').map((tr) => kids(tr, 'tc').map((tc) => clean(cellText(tc).replace(/\n/g, ' / '))));
@@ -202,13 +204,14 @@ export function mergeSiteCos(o: Outline, site: CO[]): Outline {
 }
 
 /** Course information when no course_information.xlsx is given: the outline's header and teachers, plus the roll range typed on the page. */
-export function infoFromOutline(o: Outline, a: { semester: string; batch: string; count: number; missingIds: string[]; extraIds?: string[]; courseType?: string }): CourseInfo {
+export function infoFromOutline(o: Outline, a: { semester: string; batch: string; count: number; missingIds: string[]; extraIds?: string[]; courseType?: string }, site?: SiteInfo | null): CourseInfo {
   const h = o.header;
-  const credit = Number(h.credit);
-  if (!o.courseNo) throw new Error('course outline: no "Course No:" / "Course Number:" found, so the course information workbook is needed');
-  if (!Number.isFinite(credit) || credit <= 0) throw new Error('course outline: no "Credit hours:" found, so the course information workbook is needed');
+  const credit = Number(site?.credit || h.credit);
+  const courseNo = o.courseNo || site?.courseNo || '';
+  if (!courseNo) throw new Error('course outline: no course number found ("Course No:", "Course Number:" or "Description of the Course BME …"); pick the course on this page or add the course information workbook');
+  if (!Number.isFinite(credit) || credit <= 0) throw new Error(`the credit hours of ${courseNo} are not known: pick the course on this page (the website has them) or add the course information workbook`);
   return {
-    courseNo: o.courseNo, credit, contactHours: h.contact ?? '', level: h.level ?? '', term: h.term ?? '', semester: a.semester, session: h.session ?? '',
+    courseNo, credit, contactHours: h.contact ?? '', level: h.level ?? '', term: h.term ?? '', semester: a.semester, session: h.session ?? '',
     extra: { batch: a.batch, ...(a.courseType ? { course_type: a.courseType } : {}) },
     faculties: o.teachers.map((t) => ({ name: t.name, section: '', office_room: t.room, email: t.email, telephone: t.phone, consultation: '' })),
     routine: o.routine,
