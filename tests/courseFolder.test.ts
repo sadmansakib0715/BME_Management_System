@@ -308,6 +308,31 @@ describe("the department's outline layout", () => {
     expect(Object.fromEntries([...res.attainment.co].map(([k, v]) => [k, v.pct]))).toEqual({ 1: 50, 2: 50, 3: 100 });   // read by the column headers, whatever the order
   }, 30000);
 
+  it("keeps the teachers' details from the attached course information when the course is linked to the website", async () => {
+    // Workbook: a "teachers" sheet with its own column names. Website: the same teachers, assigned, but no rooms or phones yet.
+    const wbk = new ExcelJS.Workbook();
+    const add = (name: string, rows: (string | number)[][]) => { const ws = wbk.addWorksheet(name); rows.forEach((r) => ws.addRow(r)); };
+    add('info', [['course_no', 'credit_hours', 'level', 'term', 'semester', 'session'], ['BME 320', 1, 3, 2, 'July 2025', '2022-2023']]);
+    add('teachers', [['Name', 'Office/Room', 'Email', 'Phone'], ['Dr. Book Teacher', 'ECE-1301', 'book@example.edu', '+880 1800-000001'], ['Ms. Second One', 'ECE-1302', 'two@example.edu', '+880 1800-000002']]);
+    add('routine', [['section', 'day', 'start_time', 'end_time'], ['A1', 'Monday', '09:00 AM', '11:30 AM']]);
+    const info = new Uint8Array(await wbk.xlsx.writeBuffer());
+    const site = { courseNo: 'BME 320', credit: 1, level: '3', term: '2', semester: 'July 2025', routine: [], routineText: '',
+      faculties: [{ name: 'Book Teacher', section: '', office_room: '', email: 'book@bme.example.edu', telephone: '', consultation: '' }] };
+    const src = { outline, info, site, roll: { semester: '', batch: '21', count: 2, missingIds: [] } };
+    const p = await previewSources(src);
+    expect(p.info.faculties.map((f) => [f.name, f.office_room, f.email, f.telephone])).toEqual([
+      ['Dr. Book Teacher', 'ECE-1301', 'book@example.edu', '+880 1800-000001'], ['Ms. Second One', 'ECE-1302', 'two@example.edu', '+880 1800-000002']]);
+    expect(p.info.routine).toEqual([expect.objectContaining({ day: 'Monday', section: 'A1' })]);
+    const t = await buildMarksTemplate(src, p.plan);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(t.bytes as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet('ca')!;
+    [[16, 8, 56], [12, 6, 40]].forEach((r, i) => r.forEach((v, k) => (ws.getCell(5 + i, 2 + k).value = v)));
+    const res = await buildCourseFolder({ ...src, marks: new Uint8Array(await wb.xlsx.writeBuffer()), templates });
+    const xml = await docText(await JSZip.loadAsync(res.zip), 'BME 320 (July 2025)/BME 320_Course outline.docx');
+    for (const x of ['Dr. Book Teacher', 'ECE-1301', 'book@example.edu', '+880 1800-000001', 'Ms. Second One', 'ECE-1302', '+880 1800-000002', 'Monday (A1)', '09:00 AM - 11:30 AM']) expect(xml, x).toContain(x);
+  }, 30000);
+
   it('matches assessment names to CO assessment tools without false hits', async () => {
     const o = (tools: string[]) => ({ cos: tools.map((t, i) => ({ no: i + 1, statement: '', pos: [], domain: '', delivery: '', tools: t })) }) as unknown as Outline;
     expect(cosFor(o(['Lab Test, Continuous Assessment', 'Lab Quiz, Continuous Assessment']), 'Class Participation and Continuous Assessment')).toEqual([1, 2]);

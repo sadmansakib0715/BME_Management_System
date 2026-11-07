@@ -5,7 +5,7 @@ import { carDocx, coPoMappingDocx, instructorsDocx, reportDocx } from './docs';
 import { checkInfo, infoFromOutline, loadWorkbook, mergeMapping, mergeSiteCos, parseRoutine, readCourseInfo, readOutline } from './inputs';
 import {
   clean, computeAttainment, fmtNum, initials, norm, isSessional, safeName, sampleStats, studentIds,
-  type Attainment, type CO, type CourseInfo, type Marks, type Outline, type Sample, type SiteInfo, Warnings,
+  type Attainment, type CO, type CourseInfo, type Marks, type Outline, type Rec, type Sample, type SiteInfo, Warnings,
 } from './model';
 import { departmentOutlineDocx } from './outlineDoc';
 import { numberedFolders, planFromOutline, type Plan } from './plan';
@@ -32,7 +32,18 @@ export interface RollInput { semester: string; batch: string; count: number; mis
 export interface Sources { outline: Bytes; mapping?: Bytes | null; info?: Bytes | null; roll?: RollInput | null; siteCos?: CO[]; site?: SiteInfo | null }
 
 /** The website's course details, teachers and routine replace the workbook's / outline's (they are kept up to date there). */
-function withSite(info: CourseInfo, site: SiteInfo, o: Outline, w: Warnings): CourseInfo {
+const bareName = (n: string) => clean(n).toLowerCase().replace(/^(dr|mr|ms|mrs|md|prof|engr)\.?\s+/g, '').replace(/[^a-z]/g, '');
+const sameTeacher = (a: string, b: string) => { const x = bareName(a), y = bareName(b); return !!x && !!y && (x === y || x.includes(y) || y.includes(x)); };
+/** Teachers from `main`, each with blank room / email / phone filled from the matching name in `other`. */
+function fillTeachers(main: Rec[], other: Rec[]): Rec[] {
+  return main.map((f) => {
+    const o = other.find((x) => sameTeacher(x.name ?? '', f.name ?? '')) ?? {};
+    return { ...f, office_room: clean(f.office_room) || clean(o.office_room), email: clean(f.email) || clean(o.email), telephone: clean(f.telephone) || clean(o.telephone) };
+  });
+}
+
+/** `teachersGiven`: the course information workbook lists the teachers; then its teachers and routine are kept (the website fills blanks). */
+function withSite(info: CourseInfo, site: SiteInfo, o: Outline, w: Warnings, teachersGiven = false): CourseInfo {
   if (o.courseNo && norm(o.courseNo) !== norm(site.courseNo)) w.add(`the outline is for '${o.courseNo}' but this is ${site.courseNo}`);
   const out: CourseInfo = { ...info, extra: { ...info.extra } };
   out.courseNo = site.courseNo;
@@ -43,11 +54,12 @@ function withSite(info: CourseInfo, site: SiteInfo, o: Outline, w: Warnings): Co
   if (site.semester) out.semester = site.semester;
   if (site.courseType) out.extra.course_type = site.courseType;
   if (site.title) out.extra.title = site.title;
-  if (site.faculties.length) out.faculties = site.faculties;
+  if (teachersGiven) out.faculties = fillTeachers(info.faculties, site.faculties);
+  else if (site.faculties.length) out.faculties = fillTeachers(site.faculties, info.faculties);
   // The routine typed on the Outline page: one row per class; a line that is not "Day (A1): 09:00 AM-11:00 AM" is kept as it is.
   const typed = (site.routineText ?? '').split('\n').map(clean).filter(Boolean);
   const routine = site.routine.length ? site.routine : typed.flatMap((l) => { const r = parseRoutine(l); return r.length ? r : [{ day: l, section: '', start_time: '', end_time: '' }]; });
-  if (routine.length) out.routine = routine;
+  if (routine.length && !(teachersGiven && info.routine.length)) out.routine = routine;
   return out;
 }
 
@@ -69,10 +81,11 @@ export async function readSources(s: Sources, w: Warnings): Promise<{ info: Cour
   if (s.siteCos?.length) outline = mergeSiteCos(outline, s.siteCos);
   if (!outline.cos.some((c) => c.pos.length)) w.add('no CO-PO mapping found: add the CO-PO Mapping.docx (or set the mapping on the OBE page), otherwise PO attainment cannot be worked out');
   let info: CourseInfo;
-  if (s.info) info = checkInfo(await readCourseInfo(s.info), outline, w);
+  let teachersGiven = false;
+  if (s.info) { const x = await readCourseInfo(s.info); teachersGiven = x.faculties.length > 0; info = checkInfo(x, outline, w); }
   else if (s.site || s.roll) info = infoFromOutline(outline, { semester: s.roll?.semester ?? '', batch: s.roll?.batch ?? '', count: s.roll?.count ?? 0, missingIds: s.roll?.missingIds ?? [], extraIds: s.roll?.extraIds }, s.site);
   else throw new Error('give the course information workbook, or the batch and number of students');
-  if (s.site) info = withSite(info, s.site, outline, w);
+  if (s.site) info = withSite(info, s.site, outline, w, teachersGiven);
   if (s.roll && s.info) info = withRoll(info, s.roll, w);
   return { info, outline };
 }

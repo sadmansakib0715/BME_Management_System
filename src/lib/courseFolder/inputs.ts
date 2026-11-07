@@ -44,6 +44,14 @@ export function sheetRecords(ws: ExcelJS.Worksheet | undefined): Rec[] {
   return out;
 }
 
+/** A teachers row with the usual column names (name, office_room, email, telephone), whatever the sheet called them. */
+function teacherRecord(r: Rec): Rec {
+  const pick = (...ks: string[]) => { for (const k of ks) { const hit = Object.keys(r).find((x) => x.replace(/[^a-z]/g, '') === k); if (hit && clean(r[hit])) return clean(r[hit]); } return ''; };
+  return { ...r, name: pick('name', 'teachername', 'facultyname', 'teacher', 'faculty', 'courseteacher'),
+    office_room: pick('officeroom', 'office', 'room', 'roomno', 'officeroomno'), email: pick('email', 'emailaddress', 'mail'),
+    telephone: pick('telephone', 'phone', 'mobile', 'phoneno', 'mobileno', 'contact', 'contactno', 'cell'), section: pick('section', 'sections') };
+}
+
 export async function readCourseInfo(data: ArrayBuffer | Uint8Array): Promise<CourseInfo> {
   const wb = await loadWorkbook(data);
   const sheet = (n: string) => wb.worksheets.find((w) => w.name.trim().toLowerCase() === n);
@@ -58,7 +66,8 @@ export async function readCourseInfo(data: ArrayBuffer | Uint8Array): Promise<Co
     courseNo: clean(info.course_no || info.course_number).toUpperCase().replace(/^([A-Z]+)\s*-?\s*(\d)/, '$1 $2'),
     credit, contactHours: info.contact_hours ?? '', level: info.level ?? '', term: info.term ?? '',
     semester: info.semester ?? '', session: info.session ?? '', extra,
-    faculties: sheetRecords(sheet('faculties')), routine: sheetRecords(sheet('routine')), sections: sheetRecords(sheet('sections')),
+    faculties: sheetRecords(sheet('faculties') ?? sheet('faculty') ?? sheet('teachers') ?? sheet('teacher') ?? sheet('instructors') ?? sheet('course_teachers')).map(teacherRecord).filter((f) => f.name),
+    routine: sheetRecords(sheet('routine') ?? sheet('class_routine')), sections: sheetRecords(sheet('sections')),
   };
 }
 

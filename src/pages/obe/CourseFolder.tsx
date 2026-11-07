@@ -295,7 +295,8 @@ function OutlineSummary({ info, outline }: { info: CourseInfo; outline: Outline 
         <dt className="text-muted">Course</dt><dd><span className="font-mono">{info.courseNo}</span> · {outline.title || '—'}</dd>
         <dt className="text-muted">Credit / contact hours</dt><dd className="tabular">{info.credit} / {info.contactHours || '—'}</dd>
         <dt className="text-muted">Level/Term · Session</dt><dd>{info.level || '—'}/{info.term || '—'} · {info.session || '—'}</dd>
-        <dt className="text-muted">Teachers</dt><dd>{info.faculties.map((f) => f.name).filter(Boolean).join(', ') || '—'}</dd>
+        <dt className="text-muted">Teachers</dt><dd>{info.faculties.filter((f) => f.name).length ? <ul className="space-y-0.5">{info.faculties.filter((f) => f.name).map((f, i) => (
+          <li key={i}>{f.name}<span className="text-2xs text-muted">{[f.office_room, f.email, f.telephone].filter(Boolean).length ? ` · ${[f.office_room, f.email, f.telephone].filter(Boolean).join(' · ')}` : ' · no room, email or phone yet'}</span></li>))}</ul> : '—'}</dd>
       </dl>
       <ul className="border-t border-line divide-y divide-line">
         {outline.cos.map((c) => (
